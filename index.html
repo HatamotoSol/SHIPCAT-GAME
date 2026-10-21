@@ -24,6 +24,8 @@
     --panel: #171513;
     --line: #2C2723;
     --veil: rgba(14, 14, 14, 0.9);
+    --ok: #9bd6a4;
+    --warn: #ff9b7a;
     --display: 'Dela Gothic One', 'Arial Black', Impact, system-ui, sans-serif;
     --body: 'Familjen Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
     color-scheme: dark;
@@ -113,7 +115,9 @@
   a.chip:hover { border-color: var(--orange); }
   a.chip:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
   .chip svg { width: 15px; height: 15px; flex: none; }
-  .chip.ca { color: var(--dim); cursor: default; }
+  button.chip { font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-align: left; max-width: 100%; }
+  button.chip:hover { border-color: var(--orange); }
+  .chip.ca span { font-size: 13px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
   .chip.ca b { color: var(--orange); letter-spacing: 0.08em; }
   .rules { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 0; padding: 0; list-style: none; }
   .rules li { font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--line); color: #CFC8BB; }
@@ -123,48 +127,82 @@
   .stats div { min-width: 0; }
   .stats dt { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
   .stats dd { margin: 2px 0 0; font-family: var(--display); font-size: 26px; font-variant-numeric: tabular-nums; }
-  /* Home-screen wallet controls only; gameplay UI remains unchanged. */
-  .wallet-panel {
-    width: min(100%, 390px); display: grid; gap: 9px; padding: 12px;
-    border: 1.5px solid var(--line); border-radius: 16px;
-    background: rgba(23, 21, 19, 0.88); text-align: center; margin-inline: auto;
+  /* ---------- wallet ---------- */
+  .wallet-bar { position: absolute; z-index: 6; top: 12px; right: max(16px, env(safe-area-inset-right, 0px)); }
+  .wallet-pill {
+    display: inline-flex; align-items: center; gap: 9px; height: 42px; padding: 0 12px 0 10px; max-width: calc(100vw - 32px);
+    border-radius: 12px; border: 1.5px solid var(--line); background: rgba(23, 21, 19, 0.92); color: var(--ink);
+    font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
   }
-  .wallet-heading { display: flex; justify-content: center; align-items: center; gap: 10px; text-align: center; }
-  .wallet-heading strong { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; }
-  .wallet-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-  .wallet-btn {
-    flex: 1 1 100px; min-width: 0; border: 1.5px solid var(--line); border-radius: 10px;
-    padding: 10px 12px; background: #201c18; color: var(--ink); font: inherit;
-    font-weight: 700; cursor: pointer;
+  .wallet-pill:hover { border-color: var(--orange); }
+  .wallet-pill.cta { background: var(--orange); border-color: var(--orange); color: var(--bg); padding: 0 16px 0 12px; box-shadow: 0 3px 0 var(--orange-deep); }
+  .wallet-pill.cta:hover { background: #ff6c36; }
+  .wallet-pill svg { width: 18px; height: 18px; flex: none; }
+  .wallet-pill #walletCaret { width: 14px; height: 14px; opacity: 0.7; }
+  #walletIcoSlot { display: inline-flex; }
+  .w-ico { width: 24px; height: 24px; border-radius: 7px; flex: none; object-fit: cover; display: block; }
+  .w-ico.tile { display: grid; place-items: center; font-family: var(--display); font-size: 13px; color: var(--ink); background: #2c2621; }
+  .w-row .w-ico, .wm-head .w-ico { width: 34px; height: 34px; border-radius: 10px; font-size: 15px; }
+  .wallet-menu {
+    position: absolute; top: 50px; right: 0; width: min(300px, calc(100vw - 32px)); padding: 14px; display: grid; gap: 12px;
+    border: 1.5px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); text-align: left;
   }
-  .wallet-btn:hover { border-color: var(--orange); }
-  .wallet-btn.primary-wallet { background: var(--orange); border-color: var(--orange); color: var(--bg); }
-  .wallet-btn.other-wallet { flex: 0 0 auto; padding: 6px 10px; font-size: 12px; border-radius: 8px; opacity: 0.9; }
-  .wallet-btn:disabled { opacity: 0.55; cursor: wait; }
-  .wallet-status { margin: 0; color: var(--dim); font-size: 12px; overflow-wrap: anywhere; text-align: center; }
-  .wallet-status.connected { color: #9bd6a4; }
-  .wallet-status.error { color: #ff9b7a; }
-  .guest-modal {
-    position: absolute; inset: 0; z-index: 10; display: grid; place-items: center;
-    padding: 20px; background: rgba(10, 9, 8, 0.88);
+  .wm-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .wm-head > div { min-width: 0; }
+  .wm-name { font-weight: 700; font-size: 15px; }
+  .wm-addr { margin-top: 2px; font-size: 12px; color: var(--dim); overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+  .wm-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
+  .wm-stats div { background: #1d1a17; border-radius: 10px; padding: 8px 6px; text-align: center; min-width: 0; }
+  .wm-stats dt { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+  .wm-stats dd { margin: 2px 0 0; font-family: var(--display); font-size: 18px; font-variant-numeric: tabular-nums; }
+  .wm-actions { display: flex; gap: 8px; }
+  .btn-sm {
+    flex: 1; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #201c18; color: var(--ink);
+    font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
   }
-  .guest-card {
-    width: min(100%, 420px); display: grid; gap: 14px; padding: 22px;
-    border: 1.5px solid var(--line); border-radius: 18px; background: #171513;
-    box-shadow: 0 18px 60px rgba(0,0,0,.4); text-align: center;
+  .btn-sm:hover { border-color: var(--orange); }
+  .btn-sm.solid { background: var(--orange); border-color: var(--orange); color: var(--bg); }
+  .btn-sm.solid:hover { background: #ff6c36; }
+
+  .modal {
+    position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; overflow-y: auto; background: rgba(10, 9, 8, 0.88);
+    padding-top: 16px; padding-bottom: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
-  .guest-card p { margin: 0; color: var(--dim); font-size: 14px; }
-  .other-wallet-list { display: grid; gap: 8px; }
-  .other-wallet-list .wallet-btn { width: 100%; }
-  .guest-input {
-    width: 100%; box-sizing: border-box; border: 1.5px solid var(--line); border-radius: 10px;
-    padding: 13px 12px; background: #0e0d0c; color: var(--ink); font: inherit; font-size: 14px;
+  .modal-card {
+    width: min(100%, 420px); display: grid; gap: 14px; padding: 20px; margin: auto; text-align: left;
+    border: 1.5px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
   }
-  .guest-input:focus { outline: 2px solid var(--orange); outline-offset: 2px; }
-  .guest-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
-  .guest-error { color: #ff9b7a !important; min-height: 1em; }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .modal-head h2 { font-size: 26px; text-align: left; }
+  .m-sub { margin: 0; color: var(--dim); font-size: 14px; }
+  .w-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .w-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px; padding: 10px 12px;
+    border: 1.5px solid var(--line); border-radius: 12px; background: #1d1a17; color: var(--ink);
+    font: inherit; font-size: 16px; font-weight: 700; text-align: left; cursor: pointer;
+  }
+  .w-row:hover:not(:disabled) { border-color: var(--orange); }
+  .w-row:disabled { opacity: 0.55; cursor: wait; }
+  .w-name { flex: 1; min-width: 0; }
+  .w-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
+  .w-tag.on { color: var(--ok); border-color: rgba(155, 214, 164, 0.35); background: rgba(155, 214, 164, 0.1); }
+  .m-or { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .m-or::before, .m-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .guest-form { display: grid; gap: 10px; }
+  .m-input {
+    width: 100%; border: 1.5px solid var(--line); border-radius: 10px; padding: 13px 12px; background: #0e0d0c; color: var(--ink);
+    font: inherit; font-size: 14px; -webkit-user-select: text; user-select: text;
+  }
+  .m-input:focus { outline: 2px solid var(--orange); outline-offset: 2px; }
+  .m-msg { margin: 0; min-height: 1.3em; font-size: 13px; color: var(--warn); }
+  .m-note { margin: 0; font-size: 12px; color: var(--dim); }
+  .wallet-pill:focus-visible, .btn-sm:focus-visible, .w-row:focus-visible, .chip:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
   .tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bg); background: var(--ink); padding: 5px 12px; border-radius: 999px; }
 
+  @media (min-height: 561px) {
+    .overlay { padding-top: 64px; }
+  }
   @media (max-height: 560px) {
     .hero { display: none; }
     .tiny { display: none; }
@@ -245,49 +283,14 @@
       <li>Gold box pays <b>3</b></li>
       <li>Miss <b>3</b> and it's over</li>
     </ul>
-    <section class="wallet-panel" aria-label="Wallet settings">
-      <div class="wallet-heading">
-        <strong>Wallet settings</strong>
-      </div>
-      <div class="wallet-actions">
-        <button class="wallet-btn primary-wallet" id="connectWalletBtn" type="button">Phantom</button>
-        <button class="wallet-btn" id="connectSolflareBtn" type="button">Solflare</button>
-        <button class="wallet-btn other-wallet" id="connectOtherWalletBtn" type="button">Other wallets</button>
-        <button class="wallet-btn" id="disconnectWalletBtn" type="button" hidden>Disconnect</button>
-      </div>
-      <p class="wallet-status" id="walletStatus" role="status" aria-live="polite">Optional · Connect a Solana wallet before playing.</p>
-    </section>
     <button class="primary" id="playBtn">Play</button>
     <p class="tiny">Space or Enter to play</p>
-    <div class="guest-modal" id="guestModal" hidden>
-      <section class="guest-card" role="dialog" aria-modal="true" aria-labelledby="guestTitle">
-        <h2 id="guestTitle">Play as guest</h2>
-        <p>Paste your Solana wallet address to continue. No wallet extension needed.</p>
-        <input class="guest-input" id="guestWalletAddress" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Paste Solana wallet address" aria-label="Solana wallet address" />
-        <p class="guest-error" id="guestWalletError" role="alert"></p>
-        <div class="guest-actions">
-          <button class="wallet-btn" id="cancelGuestBtn" type="button">Cancel</button>
-          <button class="primary" id="continueGuestBtn" type="button">Continue</button>
-        </div>
-      </section>
-    </div>
-    <div class="guest-modal" id="otherWalletModal" hidden>
-      <section class="guest-card" role="dialog" aria-modal="true" aria-labelledby="otherWalletTitle">
-        <h2 id="otherWalletTitle">Other wallets</h2>
-        <p id="otherWalletDescription">Choose a compatible Solana wallet installed in this browser.</p>
-        <div class="other-wallet-list" id="otherWalletList"></div>
-        <p class="guest-error" id="otherWalletError" role="status"></p>
-        <div class="guest-actions">
-          <button class="wallet-btn" id="closeOtherWalletsBtn" type="button">Close</button>
-        </div>
-      </section>
-    </div>
     <div class="links">
       <a class="chip" href="https://x.com/i/communities/1974725158540574780" target="_blank" rel="noopener noreferrer">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         Join the X community
       </a>
-      <span class="chip ca"><b>CA</b> 4vFXRCwsWZZm3md2VYJY5iA3FawDiGWArMkxcsrV3wmM</span>
+      <button class="chip ca" id="caBtn" type="button" aria-label="Copy contract address"><b>CA</b> <span id="caText">4vFXRCwsWZZm3md2VYJY5iA3FawDiGWArMkxcsrV3wmM</span></button>
     </div>
   </div>
 
@@ -309,6 +312,47 @@
       <div><dt>Best score</dt><dd id="sBest">0</dd></div>
     </dl>
     <button class="primary" id="againBtn">Play again</button>
+  </div>
+  <!-- Wallet: top-right control, account menu, picker -->
+  <div class="wallet-bar" id="walletBar">
+    <button class="wallet-pill cta" id="walletPill" type="button" aria-haspopup="true" aria-expanded="false">
+      <span id="walletIcoSlot"></span>
+      <span id="walletLabel">Connect wallet</span>
+      <svg id="walletCaret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" hidden aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="wallet-menu" id="walletMenu" hidden>
+      <div class="wm-head"><span id="wmIco"></span><div><div class="wm-name" id="wmName"></div><div class="wm-addr" id="wmAddr"></div></div></div>
+      <dl class="wm-stats">
+        <div><dt>Best</dt><dd id="mBest">0</dd></div>
+        <div><dt>Ticks</dt><dd id="mTicks">0</dd></div>
+        <div><dt>Streak</dt><dd id="mStreak">0</dd></div>
+      </dl>
+      <div class="wm-actions">
+        <button class="btn-sm" id="wmCopy" type="button">Copy address</button>
+        <button class="btn-sm" id="wmOut" type="button">Disconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="walletModal" hidden>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
+      <div class="modal-head">
+        <h2 id="wmTitle">Connect wallet</h2>
+        <button class="icon-btn" id="wmClose" type="button" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <p class="m-sub" id="wSub">Connect a wallet to play.</p>
+      <ul class="w-list" id="wList"></ul>
+      <p class="m-msg" id="wMsg" role="status"></p>
+      <div class="m-or">or</div>
+      <form class="guest-form" id="guestForm" autocomplete="off" novalidate>
+        <input class="m-input" id="guestInput" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste a Solana wallet address" aria-label="Solana wallet address">
+        <p class="m-msg" id="guestMsg" role="alert"></p>
+        <button class="btn-sm solid" type="submit">Play with this address</button>
+      </form>
+      <p class="m-note">Connecting only shares your public address. Nothing is signed and no transaction is sent. A pasted address is not verified, so its progress stays on this device.</p>
+    </section>
   </div>
 </div>
 
@@ -364,7 +408,6 @@
   let score = 0, lives = 3, combo = 0, comboT = 0, ticks = 0, maxCombo = 0;
   let spawnT = 0, shake = 0, nextId = 1, hintShown = true;
   let best = 0;
-  try { best = parseInt(localStorage.getItem('tickcat.best') || '0', 10) || 0; } catch (e) {}
   let muted = false;
   try { muted = localStorage.getItem('tickcat.mute') === '1'; } catch (e) {}
 
@@ -539,7 +582,10 @@
 
   // ---------- game flow ----------
   function setOverlay(name) {
-    $('hud').style.visibility = name === 'title' ? 'hidden' : 'visible';
+    const calm = name === 'title' || name === 'over';
+    $('hud').style.visibility = calm ? 'hidden' : 'visible';
+    $('walletBar').hidden = !calm;
+    if (!calm) closeMenu();
     $('title').hidden = name !== 'title';
     $('paused').hidden = name !== 'paused';
     $('over').hidden = name !== 'over';
@@ -561,7 +607,13 @@
   function endGame() {
     state = 'over';
     const isBest = score > best;
-    if (isBest) { best = score; try { localStorage.setItem('tickcat.best', String(best)); } catch (e) {} }
+    if (isBest) best = score;
+    if (identity) {
+      profile.best = Math.max(profile.best, score);
+      profile.ticks += ticks;
+      profile.streak = Math.max(profile.streak, maxCombo);
+      writeProfile();
+    }
     sfx.over();
     setTimeout(() => {
       if (state !== 'over') return;
@@ -862,195 +914,346 @@
     if (b) command(b);
   });
 
-  // ---------- optional home-screen Solana wallet connection ----------
-  // This static HTML integration connects to wallet extensions only. It does not
-  // request signatures, send transactions, or change gameplay.
-  const connectWalletBtn = $('connectWalletBtn');
-  const connectSolflareBtn = $('connectSolflareBtn');
-  const connectOtherWalletBtn = $('connectOtherWalletBtn');
-  const disconnectWalletBtn = $('disconnectWalletBtn');
-  const walletConnectButtons = [connectWalletBtn, connectSolflareBtn, connectOtherWalletBtn];
-  const walletStatus = $('walletStatus');
-  let connectedWalletProvider = null;
-  let connectedWalletName = '';
-  let walletAccountHandler = null;
+  // ---------- wallet + identity ----------
+  // A player connects a Solana wallet (any Wallet Standard wallet) or pastes an address as a guest.
+  // Connecting only reads the public address: no signature, no transaction.
+  // Progress is saved on this device under that address. A pasted address is not verified.
+  const PROFILE_KEY = 'shipcat.v1.';
+  const SESSION_KEY = 'shipcat.session';
+  const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-  function shortAddress(address) {
-    return address && address.length > 12 ? address.slice(0, 5) + '…' + address.slice(-5) : (address || '');
-  }
+  const walletBar = $('walletBar'), pill = $('walletPill'), menu = $('walletMenu'), caret = $('walletCaret');
+  const modal = $('walletModal'), wList = $('wList'), wMsg = $('wMsg'), wSub = $('wSub');
+  const guestForm = $('guestForm'), guestInput = $('guestInput'), guestMsg = $('guestMsg');
 
-  function setWalletStatus(message, kind) {
-    walletStatus.textContent = message;
-    walletStatus.classList.toggle('connected', kind === 'connected');
-    walletStatus.classList.toggle('error', kind === 'error');
-  }
+  let identity = null;                        // { kind: 'wallet' | 'guest', address, name, icon }
+  let profile = { best: 0, ticks: 0, streak: 0 };
+  let pendingPlay = false, connecting = false, lastFocus = null;
+  let activeStd = null, activeLegacy = null, unwatch = null;
 
-  function findWalletProvider(choice) {
-    const solana = window.solana;
-    const providers = (solana && Array.isArray(solana.providers)) ? solana.providers : [];
-    const phantomCandidates = [window.phantom && window.phantom.solana, ...providers, solana].filter(Boolean);
-    const phantom = phantomCandidates.find((provider) => provider.isPhantom === true);
-    const solflare = window.solflare || (solana && solana.isSolflare ? solana : null);
-    if (choice === 'Phantom') return phantom || null;
-    if (choice === 'Solflare') {
-      return solflare && (solflare.isSolflare || typeof solflare.connect === 'function') ? solflare : null;
+  const short = (a) => (a.length > 12 ? a.slice(0, 4) + '…' + a.slice(-4) : a);
+  const setMsg = (el, t) => { el.textContent = t || ''; };
+
+  function isSolAddress(s) {
+    if (typeof s !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s)) return false;
+    const bytes = [];
+    for (const ch of s) {
+      let carry = B58.indexOf(ch);
+      for (let j = 0; j < bytes.length; j++) { carry += bytes[j] * 58; bytes[j] = carry & 255; carry >>= 8; }
+      while (carry > 0) { bytes.push(carry & 255); carry >>= 8; }
     }
-    return null;
+    let zeros = 0;
+    while (zeros < s.length && s[zeros] === '1') zeros++;
+    return bytes.length + zeros === 32;
   }
 
-  function getOtherWalletProviders() {
-    const found = [];
-    const add = (name, provider) => {
-      if (!provider || typeof provider.connect !== 'function' || found.some((item) => item.provider === provider)) return;
-      found.push({ name, provider });
-    };
-    const solana = window.solana;
-    const providers = (solana && Array.isArray(solana.providers)) ? solana.providers : [];
-    providers.forEach((provider) => {
-      if (provider.isPhantom) add('Phantom', provider);
-      else if (provider.isSolflare) add('Solflare', provider);
-      else if (provider.isBackpack) add('Backpack', provider);
-      else if (provider.isGlow) add('Glow', provider);
-      else if (provider.isNightly) add('Nightly', provider);
-      else add(provider.name || 'Detected Solana wallet', provider);
-    });
-    add('Backpack', window.backpack && (window.backpack.solana || window.backpack));
-    add('Glow', window.glow && (window.glow.solana || window.glow));
-    add('Jupiter', window.jupiter && (window.jupiter.solana || window.jupiter));
-    add('Nightly', window.nightly && (window.nightly.solana || window.nightly));
-    add('Solflare', window.solflare);
-    add('Phantom', window.phantom && window.phantom.solana);
-    if (solana && !solana.isPhantom && !solana.isSolflare) add(solana.name || 'Browser Solana wallet', solana);
-    return found;
-  }
-
-  function openOtherWalletsModal() {
-    const modal = $('otherWalletModal');
-    const list = $('otherWalletList');
-    const error = $('otherWalletError');
-    list.replaceChildren();
-    error.textContent = '';
-    const providers = getOtherWalletProviders();
-    if (!providers.length) {
-      $('otherWalletDescription').textContent = 'No compatible wallet extension was detected. Install or unlock a Solana wallet extension, then try again. You can also use Play to continue as a guest.';
-    } else {
-      $('otherWalletDescription').textContent = 'Select a detected wallet to connect.';
-      providers.forEach(({ name, provider }) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'wallet-btn';
-        button.textContent = name;
-        button.addEventListener('click', () => connectWallet(name, provider));
-        list.appendChild(button);
-      });
+  // ----- per-address progress (this device) -----
+  function readProfile(addr) {
+    let p = null;
+    try { const raw = localStorage.getItem(PROFILE_KEY + addr); if (raw) p = JSON.parse(raw); } catch (e) {}
+    if (!p) {
+      p = { best: 0, ticks: 0, streak: 0 };
+      try { // carry over a best score saved before wallets existed
+        const old = parseInt(localStorage.getItem('tickcat.best') || '0', 10);
+        if (old > 0) { p.best = old; localStorage.removeItem('tickcat.best'); }
+      } catch (e) {}
     }
-    modal.hidden = false;
+    return { best: +p.best || 0, ticks: +p.ticks || 0, streak: +p.streak || 0 };
   }
-
-  function updateWalletUI(address) {
-    const connected = Boolean(address);
-    walletConnectButtons.forEach((button) => { button.hidden = connected; });
-    disconnectWalletBtn.hidden = !connected;
-    if (connected) {
-      setWalletStatus(connectedWalletName + ' connected · ' + shortAddress(address), 'connected');
-    } else {
-      setWalletStatus('Optional · Connect a Solana wallet before playing.');
-    }
+  function writeProfile() {
+    if (!identity) return;
+    try { localStorage.setItem(PROFILE_KEY + identity.address, JSON.stringify(profile)); } catch (e) {}
   }
-
-  async function connectWallet(choice, selectedProvider) {
-    walletConnectButtons.forEach((button) => { button.disabled = true; });
+  function saveSession() {
     try {
-      const provider = selectedProvider || findWalletProvider(choice);
-      if (!provider) {
-        setWalletStatus(choice + ' was not detected. Install or unlock the wallet extension, then try again.', 'error');
-        return;
-      }
-      if (connectedWalletProvider && connectedWalletProvider !== provider) {
-        try { await connectedWalletProvider.disconnect(); } catch (e) {}
-      }
-      const response = await provider.connect();
-      const publicKey = (response && response.publicKey) || provider.publicKey;
-      if (!publicKey) throw new Error('The wallet did not return a public address.');
-      connectedWalletProvider = provider;
-      connectedWalletName = choice;
-      const address = typeof publicKey.toBase58 === 'function' ? publicKey.toBase58() : String(publicKey);
-      updateWalletUI(address);
-      $('otherWalletModal').hidden = true;
-
-      if (walletAccountHandler && provider.removeListener) {
-        provider.removeListener('accountChanged', walletAccountHandler);
-      }
-      walletAccountHandler = (key) => {
-        if (!key) {
-          connectedWalletProvider = null;
-          connectedWalletName = '';
-          updateWalletUI('');
-          return;
-        }
-        const nextAddress = typeof key.toBase58 === 'function' ? key.toBase58() : String(key);
-        updateWalletUI(nextAddress);
-      };
-      if (provider.on) provider.on('accountChanged', walletAccountHandler);
-    } catch (error) {
-      const message = error && error.message ? error.message : 'Wallet connection failed.';
-      setWalletStatus(message, 'error');
-    } finally {
-      walletConnectButtons.forEach((button) => { button.disabled = false; });
-    }
+      if (!identity) localStorage.removeItem(SESSION_KEY);
+      else localStorage.setItem(SESSION_KEY, JSON.stringify(identity.kind === 'guest' ? { kind: 'guest', address: identity.address } : { kind: 'wallet', name: identity.name }));
+    } catch (e) {}
+  }
+  function setIdentity(next) {
+    const changed = !identity || !next || identity.address !== next.address;
+    if (changed && state === 'playing') pause();
+    identity = next;
+    if (next) { profile = readProfile(next.address); best = profile.best; }
+    else { profile = { best: 0, ticks: 0, streak: 0 }; best = 0; }
+    saveSession();
+    paintWallet();
+    hud(false);
   }
 
-  connectWalletBtn.addEventListener('click', () => connectWallet('Phantom'));
-  connectSolflareBtn.addEventListener('click', () => connectWallet('Solflare'));
-  connectOtherWalletBtn.addEventListener('click', openOtherWalletsModal);
-  $('closeOtherWalletsBtn').addEventListener('click', () => { $('otherWalletModal').hidden = true; });
-
-
-  disconnectWalletBtn.addEventListener('click', async () => {
-    const provider = connectedWalletProvider;
-    if (provider && walletAccountHandler && provider.removeListener) {
-      provider.removeListener('accountChanged', walletAccountHandler);
-    }
-    connectedWalletProvider = null;
-    connectedWalletName = '';
-    walletAccountHandler = null;
-    try { if (provider && provider.disconnect) await provider.disconnect(); } catch (e) {}
-    updateWalletUI('');
+  // ----- Wallet Standard registry (wallets announce themselves, with their own icon) -----
+  const stdWallets = [];
+  function isSolWallet(w) {
+    try {
+      return !!w && typeof w.name === 'string' && Array.isArray(w.chains) && w.chains.some((c) => String(c).indexOf('solana:') === 0) && !!(w.features && w.features['standard:connect']);
+    } catch (e) { return false; }
+  }
+  const stdApi = Object.freeze({
+    register(...ws) {
+      for (const w of ws) if (isSolWallet(w) && !stdWallets.includes(w)) stdWallets.push(w);
+      if (!modal.hidden) renderList();
+      return () => { for (const w of ws) { const i = stdWallets.indexOf(w); if (i > -1) stdWallets.splice(i, 1); } if (!modal.hidden) renderList(); };
+    },
+    get() { return stdWallets.slice(); },
+    on() { return () => {}; }
   });
+  try { window.addEventListener('wallet-standard:register-wallet', (e) => { try { e.detail(stdApi); } catch (err) {} }); } catch (e) {}
+  try { window.dispatchEvent(new CustomEvent('wallet-standard:app-ready', { detail: stdApi })); } catch (e) {}
 
+  const enc = encodeURIComponent;
+  const CATALOG = [
+    { key: 'jupiter', name: 'Jupiter', test: /jupiter/i, site: 'https://jup.ag/', link: null },
+    { key: 'phantom', name: 'Phantom', test: /phantom/i, site: 'https://phantom.app/download', link: (u, o) => 'https://phantom.app/ul/browse/' + enc(u) + '?ref=' + enc(o) },
+    { key: 'solflare', name: 'Solflare', test: /solflare/i, site: 'https://solflare.com/download', link: (u, o) => 'https://solflare.com/ul/v1/browse/' + enc(u) + '?ref=' + enc(o) },
+    { key: 'backpack', name: 'Backpack', test: /backpack/i, site: 'https://backpack.app/downloads', link: null }
+  ];
 
-  const guestModal = $('guestModal');
-  const guestWalletInput = $('guestWalletAddress');
-  const guestWalletError = $('guestWalletError');
-  // Guest mode accepts a pasted public address; it does not prove wallet ownership.
-  window.shipcatGuestWalletAddress = '';
-  function openGuestModal() {
-    guestWalletError.textContent = '';
-    guestModal.hidden = false;
-    guestWalletInput.value = window.shipcatGuestWalletAddress || '';
-    setTimeout(() => guestWalletInput.focus(), 0);
-  }
-  function closeGuestModal() { guestModal.hidden = true; }
-  function continueAsGuest() {
-    const address = guestWalletInput.value.trim();
-    // Solana public keys use base58 characters and are typically 32–44 characters long.
-    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
-      guestWalletError.textContent = 'Enter a valid-looking Solana wallet address (32–44 characters).';
-      guestWalletInput.focus();
-      return;
+  function buildEntries() {
+    const out = [], used = new Set();
+    for (const w of stdWallets) {
+      const cat = CATALOG.find((c) => c.test.test(w.name));
+      out.push({ name: w.name, icon: w.icon || '', detected: true, wallet: w, cat });
+      if (cat) used.add(cat.key);
     }
-    window.shipcatGuestWalletAddress = address;
-    closeGuestModal();
-    startGame();
+    // older injected providers that do not announce themselves
+    const legacy = [
+      ['phantom', window.phantom && window.phantom.solana && window.phantom.solana.isPhantom ? window.phantom.solana : null],
+      ['solflare', window.solflare && window.solflare.isSolflare ? window.solflare : null]
+    ];
+    for (const [key, prov] of legacy) {
+      if (prov && !used.has(key)) { const cat = CATALOG.find((c) => c.key === key); out.push({ name: cat.name, icon: '', detected: true, legacy: prov, cat }); used.add(key); }
+    }
+    for (const cat of CATALOG) if (!used.has(cat.key)) out.push({ name: cat.name, icon: '', detected: false, cat });
+    return out.sort((a, b) => (b.detected ? 1 : 0) - (a.detected ? 1 : 0));
   }
-  $('playBtn').addEventListener('click', openGuestModal);
-  $('cancelGuestBtn').addEventListener('click', closeGuestModal);
-  $('continueGuestBtn').addEventListener('click', continueAsGuest);
-  guestWalletInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') { event.preventDefault(); continueAsGuest(); }
-    if (event.key === 'Escape') closeGuestModal();
+
+  // ----- icons -----
+  const GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><path d="M4 7.5V17a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 1 4 7.5z"/><circle cx="16.2" cy="13.5" r="1.1" fill="currentColor"/></svg>';
+  function tile(name) {
+    const s = document.createElement('span');
+    s.className = 'w-ico tile'; s.setAttribute('aria-hidden', 'true');
+    s.textContent = (name || '?').trim().charAt(0).toUpperCase();
+    return s;
+  }
+  function icoEl(o) {
+    if (typeof o.icon === 'string' && /^(data:image\/|https:\/\/)/.test(o.icon)) {
+      const img = new Image();
+      img.className = 'w-ico'; img.alt = ''; img.src = o.icon;
+      img.addEventListener('error', () => img.replaceWith(tile(o.name)));
+      return img;
+    }
+    return tile(o.name);
+  }
+
+  // ----- paint the top-right control -----
+  function paintWallet() {
+    const slot = $('walletIcoSlot');
+    if (identity) {
+      pill.classList.remove('cta');
+      $('walletLabel').textContent = short(identity.address);
+      slot.replaceChildren(icoEl(identity));
+      caret.hidden = false;
+      pill.setAttribute('aria-label', 'Wallet ' + short(identity.address) + ', open account menu');
+    } else {
+      pill.classList.add('cta');
+      $('walletLabel').textContent = 'Connect wallet';
+      slot.innerHTML = GLYPH;
+      caret.hidden = true;
+      pill.setAttribute('aria-label', 'Connect wallet');
+    }
+    if (!menu.hidden) { if (identity) renderMenu(); else closeMenu(); }
+  }
+  function renderMenu() {
+    if (!identity) return;
+    $('wmIco').replaceChildren(icoEl(identity));
+    $('wmName').textContent = identity.kind === 'guest' ? 'Guest address' : identity.name;
+    $('wmAddr').textContent = identity.address;
+    $('mBest').textContent = profile.best;
+    $('mTicks').textContent = profile.ticks;
+    $('mStreak').textContent = profile.streak;
+    $('wmOut').textContent = identity.kind === 'guest' ? 'Remove' : 'Disconnect';
+    $('wmCopy').textContent = 'Copy address';
+  }
+  function openMenu() { renderMenu(); menu.hidden = false; pill.setAttribute('aria-expanded', 'true'); }
+  function closeMenu() { menu.hidden = true; pill.setAttribute('aria-expanded', 'false'); }
+
+  // ----- picker -----
+  function renderList() {
+    wList.replaceChildren();
+    for (const entry of buildEntries()) {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'w-row';
+      b.appendChild(icoEl(entry));
+      const n = document.createElement('span'); n.className = 'w-name'; n.textContent = entry.name; b.appendChild(n);
+      const t = document.createElement('span');
+      t.className = 'w-tag' + (entry.detected ? ' on' : '');
+      t.textContent = entry.detected ? 'Detected' : (IS_MOBILE ? (entry.cat && entry.cat.link ? 'Open app' : 'Not detected') : 'Install');
+      b.appendChild(t);
+      b.addEventListener('click', () => connectEntry(entry));
+      li.appendChild(b);
+      wList.appendChild(li);
+    }
+  }
+  function openModal(fromPlay) {
+    pendingPlay = !!fromPlay;
+    closeMenu();
+    renderList();
+    setMsg(wMsg, ''); setMsg(guestMsg, '');
+    wSub.textContent = fromPlay ? 'Connect a wallet to play.' : 'Connect a wallet to save your progress.';
+    lastFocus = document.activeElement;
+    modal.hidden = false;
+    setTimeout(() => { const f = wList.querySelector('button') || guestInput; if (f) f.focus({ preventScroll: true }); }, 0);
+  }
+  function closeModal() {
+    modal.hidden = true; pendingPlay = false;
+    if (lastFocus && lastFocus.focus) { try { lastFocus.focus({ preventScroll: true }); } catch (e) {} }
+  }
+  function trapTab(e) {
+    const f = Array.from(modal.querySelectorAll('button:not(:disabled), input')).filter((el) => el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], lastEl = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); lastEl.focus(); }
+    else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); first.focus(); }
+    else if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  }
+
+  function finishConnect(id) {
+    setIdentity(id);
+    const go = pendingPlay;
+    if (!modal.hidden) closeModal();
+    if (go) startGame();
+  }
+
+  // ----- connect / disconnect -----
+  function friendly(err) {
+    const m = String((err && err.message) || err || '');
+    if ((err && err.code === 4001) || /reject|declin|cancel|denied|closed/i.test(m)) return 'Connection cancelled. Tap the wallet to try again.';
+    return m || 'Could not connect. Try again.';
+  }
+  function unwatchWallet() {
+    if (unwatch) { try { unwatch(); } catch (e) {} unwatch = null; }
+  }
+  function dropWallet() { unwatchWallet(); activeStd = null; activeLegacy = null; setIdentity(null); }
+  function watchStd(w) {
+    unwatchWallet();
+    const ev = w.features['standard:events'];
+    if (!ev || typeof ev.on !== 'function') return;
+    unwatch = ev.on('change', (p) => {
+      if (!p || !p.accounts) return;
+      if (!p.accounts.length) { dropWallet(); return; }
+      const a = p.accounts[0] && p.accounts[0].address;
+      if (a && identity && identity.kind === 'wallet' && a !== identity.address) setIdentity({ kind: 'wallet', address: a, name: identity.name, icon: identity.icon });
+    });
+  }
+  function watchLegacy(p) {
+    unwatchWallet();
+    if (typeof p.on !== 'function') return;
+    const onAcc = (k) => {
+      if (!k) { dropWallet(); return; }
+      const a = typeof k.toBase58 === 'function' ? k.toBase58() : String(k);
+      if (identity && identity.kind === 'wallet' && a !== identity.address) setIdentity({ kind: 'wallet', address: a, name: identity.name, icon: identity.icon });
+    };
+    p.on('accountChanged', onAcc); p.on('disconnect', dropWallet);
+    unwatch = () => { if (p.removeListener) { p.removeListener('accountChanged', onAcc); p.removeListener('disconnect', dropWallet); } };
+  }
+  async function runConnect(entry, silent) {
+    let address = '';
+    if (entry.wallet) {
+      const f = entry.wallet.features['standard:connect'];
+      const res = await f.connect(silent ? { silent: true } : undefined);
+      const list = res && res.accounts && res.accounts.length ? res.accounts : entry.wallet.accounts;
+      address = list && list[0] ? list[0].address : '';
+      if (address) { activeStd = entry.wallet; activeLegacy = null; watchStd(entry.wallet); }
+    } else {
+      const res = await entry.legacy.connect(silent ? { onlyIfTrusted: true } : undefined);
+      const pk = (res && res.publicKey) || entry.legacy.publicKey;
+      address = pk ? (typeof pk.toBase58 === 'function' ? pk.toBase58() : String(pk)) : '';
+      if (address) { activeLegacy = entry.legacy; activeStd = null; watchLegacy(entry.legacy); }
+    }
+    return address;
+  }
+  function openInstall(entry) {
+    const cat = entry.cat;
+    if (IS_MOBILE && cat && cat.link) { location.href = cat.link(location.href.split('#')[0], location.origin); return; }
+    if (IS_MOBILE) { setMsg(wMsg, entry.name + ' was not detected in this browser. Open this page from inside the ' + entry.name + ' app, or pick another wallet.'); return; }
+    if (cat && cat.site) { window.open(cat.site, '_blank', 'noopener'); setMsg(wMsg, 'Install ' + entry.name + ', then reload this page.'); }
+  }
+  function setBusy(on) { wList.querySelectorAll('button').forEach((b) => { b.disabled = on; }); }
+  async function connectEntry(entry) {
+    if (connecting) return;
+    if (!entry.detected) { openInstall(entry); return; }
+    connecting = true; setBusy(true); setMsg(wMsg, 'Check your wallet to approve the connection…');
+    try {
+      const address = await runConnect(entry, false);
+      if (!address) throw new Error('No account came back. Unlock the wallet and try again.');
+      finishConnect({ kind: 'wallet', address, name: entry.name, icon: entry.icon });
+    } catch (err) {
+      setMsg(wMsg, friendly(err));
+    } finally { connecting = false; setBusy(false); }
+  }
+  async function disconnect() {
+    const std = activeStd, leg = activeLegacy;
+    unwatchWallet(); activeStd = null; activeLegacy = null;
+    setIdentity(null);
+    try {
+      if (std && std.features['standard:disconnect']) await std.features['standard:disconnect'].disconnect();
+      else if (leg && typeof leg.disconnect === 'function') await leg.disconnect();
+    } catch (e) {}
+  }
+
+  // ----- restore the last session on load (never opens a wallet prompt) -----
+  async function silentRestore(name, attempt) {
+    const entry = buildEntries().find((e) => e.detected && e.name === name);
+    if (!entry) { if (attempt < 8) setTimeout(() => silentRestore(name, attempt + 1), 250); return; }
+    try {
+      if (entry.wallet) {
+        const v = String(entry.wallet.features['standard:connect'].version || '1.0.0').split('.').map(Number);
+        if (!(v[0] > 1 || (v[0] === 1 && v[1] >= 1))) return;   // this wallet cannot connect silently
+      }
+      const address = await runConnect(entry, true);
+      if (address && !identity) finishConnect({ kind: 'wallet', address, name: entry.name, icon: entry.icon });
+    } catch (e) { /* not approved before: stay disconnected */ }
+  }
+  function restoreSession() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) {}
+    if (!s) return;
+    if (s.kind === 'guest' && isSolAddress(s.address)) setIdentity({ kind: 'guest', address: s.address, name: 'Guest', icon: '' });
+    else if (s.kind === 'wallet' && s.name) silentRestore(s.name, 0);
+  }
+
+  // ----- the gate -----
+  function requestPlay() { if (identity) startGame(); else openModal(true); }
+
+  pill.addEventListener('click', () => { if (!identity) openModal(false); else if (menu.hidden) openMenu(); else closeMenu(); });
+  document.addEventListener('pointerdown', (e) => { if (!menu.hidden && !walletBar.contains(e.target)) closeMenu(); });
+  $('wmClose').addEventListener('click', closeModal);
+  modal.addEventListener('pointerdown', (e) => { if (e.target === modal) closeModal(); });
+  $('wmOut').addEventListener('click', async () => { closeMenu(); await disconnect(); });
+  $('wmCopy').addEventListener('click', async () => {
+    const b = $('wmCopy');
+    try { await navigator.clipboard.writeText(identity.address); b.textContent = 'Copied'; } catch (e) { b.textContent = 'Select it above'; }
+    setTimeout(() => { if (identity) b.textContent = 'Copy address'; }, 1400);
   });
-  $('againBtn').addEventListener('click', startGame);
+  guestForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const a = guestInput.value.trim();
+    if (!isSolAddress(a)) { setMsg(guestMsg, 'That is not a valid Solana address. Check it and paste again.'); guestInput.focus(); return; }
+    unwatchWallet(); activeStd = null; activeLegacy = null;
+    guestInput.value = '';
+    finishConnect({ kind: 'guest', address: a, name: 'Guest', icon: '' });
+  });
+  guestInput.addEventListener('input', () => setMsg(guestMsg, ''));
+  $('caBtn').addEventListener('click', async () => {
+    const t = $('caText'), full = t.dataset.full || t.textContent;
+    t.dataset.full = full;
+    try { await navigator.clipboard.writeText(full); t.textContent = 'Copied'; } catch (e) { t.textContent = 'Select and copy'; }
+    setTimeout(() => { t.textContent = full; }, 1400);
+  });
+  $('playBtn').addEventListener('click', requestPlay);
+  $('againBtn').addEventListener('click', requestPlay);
   $('resumeBtn').addEventListener('click', resume);
   $('pauseBtn').addEventListener('click', () => (state === 'playing' ? pause() : resume()));
   $('muteBtn').addEventListener('click', () => {
@@ -1060,11 +1263,19 @@
   });
   window.addEventListener('keydown', (e) => {
     const k = e.key;
+    if (!modal.hidden) {
+      if (k === 'Escape') { e.preventDefault(); closeModal(); }
+      else if (k === 'Tab') trapTab(e);
+      return;
+    }
+    const tg = e.target;
+    if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
+    if (k === 'Escape' && !menu.hidden) { closeMenu(); return; }
     if (k === 'p' || k === 'P' || k === 'Escape') { if (state === 'playing') pause(); else if (state === 'paused') resume(); return; }
     if (k === 'm' || k === 'M') { $('muteBtn').click(); return; }
     if ((k === ' ' || k === 'Enter') && (state === 'title' || state === 'over') && document.activeElement && document.activeElement.tagName !== 'BUTTON' && document.activeElement.tagName !== 'A') {
       e.preventDefault();
-      if (state === 'title') openGuestModal(); else if (!$('over').hidden) startGame();
+      if (state === 'title' || !$('over').hidden) requestPlay();
     }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
@@ -1076,13 +1287,16 @@
   paintMute();
   hud(false);
   setOverlay('title');
+  paintWallet();
   $('best').textContent = best;
   resize();
+  restoreSession();
   requestAnimationFrame(frame);
 
   // test hook
   window.__tickcat = {
     get state() { return state; }, get score() { return score; }, get lives() { return lives; },
+    get identity() { return identity ? { kind: identity.kind, address: identity.address } : null; }, get profile() { return { ...profile }; },
     get boxes() { return boxes.map((b) => ({ x: b.x, y: b.y, size: b.size, gold: b.gold, active: active(b) })); },
     get cat() { return { x: cat.x, y: cat.y, hop: cat.hop }; }
   };
