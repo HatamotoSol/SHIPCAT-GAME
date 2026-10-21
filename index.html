@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0E0E">
+<meta name="description" content="Tap a checkbox and the cat hops over to tick it before its outline runs out.">
+<meta property="og:title" content="Tick Cat">
+<meta property="og:description" content="Tap a checkbox and the cat hops over to tick it before its outline runs out.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230E0E0E'/%3E%3Crect x='4.5' y='4.5' width='15' height='15' rx='4' fill='none' stroke='%23FF5A1F' stroke-width='2.6'/%3E%3Cpath d='M8 12.5 L10.8 15.3 L17.5 6.5' fill='none' stroke='%23F2EEE6' stroke-width='2.8'/%3E%3C/svg%3E">
+<title>Tick Cat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Familjen+Grotesk:wght@500;700&display=swap">
+<style>
+  /* Layout: one full-bleed play field, a slim HUD pinned to the top, centred overlays for title / pause / game over.
+     Single dark look by choice: it is the brand (near-black, one orange, one cream). */
+  :root {
+    --bg: #0E0E0E;
+    --ink: #F2EEE6;
+    --orange: #FF5A1F;
+    --orange-deep: #C73C0C;
+    --dim: #8F8678;
+    --panel: #171513;
+    --line: #2C2723;
+    --veil: rgba(14, 14, 14, 0.9);
+    --display: 'Dela Gothic One', 'Arial Black', Impact, system-ui, sans-serif;
+    --body: 'Familjen Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  html { box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: inherit; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--body); font-size: 16px; line-height: 1.4;
+    overflow: hidden; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app {
+    position: relative; width: 100%; height: 100%; overflow: hidden;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(ellipse at 50% 72%, rgba(255, 90, 31, 0.17), transparent 62%),
+      radial-gradient(rgba(242, 238, 230, 0.07) 1.5px, transparent 1.7px);
+    background-size: auto, 42px 42px;
+  }
+  #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .hud {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 2; pointer-events: none;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding-top: 12px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .score { min-width: 0; }
+  .score-n { font-family: var(--display); font-size: clamp(34px, 8vw, 48px); line-height: 1; font-variant-numeric: tabular-nums; display: inline-block; transform-origin: left center; }
+  .score-n.bump { animation: bump 0.22s ease-out; }
+  @keyframes bump { 0% { transform: scale(1.25); color: var(--orange); } 100% { transform: scale(1); } }
+  .best { margin-top: 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .combo { text-align: center; padding-top: 2px; }
+  .combo-x { font-family: var(--display); font-size: clamp(26px, 6vw, 34px); color: var(--orange); line-height: 1; }
+  .combo-bar { display: block; width: 72px; height: 5px; margin: 6px auto 0; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .combo-bar i { display: block; height: 100%; width: 100%; background: var(--orange); transform-origin: left center; }
+  .side { display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+  .lives { display: flex; gap: 5px; margin-right: 4px; }
+  .life { width: 24px; height: 24px; transition: opacity 0.2s, filter 0.2s; }
+  .life.lost { opacity: 0.28; filter: grayscale(1); }
+  .icon-btn {
+    width: 42px; height: 42px; border-radius: 12px; border: 1.5px solid var(--line);
+    background: rgba(23, 21, 19, 0.8); color: var(--ink);
+    display: grid; place-items: center; padding: 0; cursor: pointer;
+  }
+  .icon-btn:hover { border-color: var(--orange); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  .hint {
+    position: absolute; left: 0; right: 0; bottom: max(28px, calc(env(safe-area-inset-bottom, 0px) + 20px)); z-index: 1;
+    text-align: center; pointer-events: none; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    font-size: 13px; color: var(--dim); transition: opacity 0.4s;
+  }
+  .hint.off { opacity: 0; }
+
+  .overlay {
+    position: absolute; inset: 0; z-index: 5; background: var(--veil);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center;
+    padding-top: 16px; padding-bottom: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    overflow-y: auto;
+  }
+  .hero { width: min(62vw, 46vh, 330px); height: auto; flex: 0 1 auto; max-width: 100%; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: clamp(40px, 9vw, 64px); line-height: 1; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 400; font-size: clamp(30px, 7vw, 44px); line-height: 1.05; margin: 0; text-wrap: balance; }
+  .lede { margin: 0; max-width: 34ch; color: #CFC8BB; font-size: 17px; text-wrap: pretty; }
+  .primary {
+    font-family: var(--display); font-size: 20px; letter-spacing: 0.02em; color: var(--bg); background: var(--orange);
+    border: 0; border-radius: 16px; padding: 15px 40px; cursor: pointer;
+    box-shadow: 0 5px 0 var(--orange-deep); transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .primary:hover { background: #ff6c36; }
+  .primary:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--orange-deep); }
+  .tiny { margin: 0; font-size: 13px; color: var(--dim); }
+  .rules { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 0; padding: 0; list-style: none; }
+  .rules li { font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--line); color: #CFC8BB; }
+  .rules b { color: var(--orange); font-weight: 700; }
+  .big-score { font-family: var(--display); font-size: clamp(64px, 18vw, 110px); line-height: 1; color: var(--orange); font-variant-numeric: tabular-nums; }
+  .stats { display: flex; gap: 22px; justify-content: center; margin: 0; }
+  .stats div { min-width: 0; }
+  .stats dt { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+  .stats dd { margin: 2px 0 0; font-family: var(--display); font-size: 26px; font-variant-numeric: tabular-nums; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bg); background: var(--ink); padding: 5px 12px; border-radius: 999px; }
+
+  @media (max-height: 560px) {
+    .hero { display: none; }
+    .overlay { gap: 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .score-n.bump { animation: none; }
+    .primary { transition: none; }
+  }
+</style>
+
+</head>
+<body>
+<div id="app">
+  <canvas id="c" aria-label="Tick Cat game board"></canvas>
+
+  <div class="hud" id="hud">
+    <div class="score">
+      <div class="score-n" id="score">0</div>
+      <div class="best">Best <span id="best">0</span></div>
+    </div>
+    <div class="combo" id="combo" hidden>
+      <div class="combo-x" id="mult">×2</div>
+      <span class="combo-bar"><i id="cbar"></i></span>
+    </div>
+    <div class="side">
+      <div class="lives" id="lives" aria-label="Lives left"></div>
+      <button class="icon-btn" id="muteBtn" aria-label="Sound on" title="Sound (M)"></button>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause" title="Pause (P)">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4.2" height="14" rx="1"/><rect x="13.8" y="5" width="4.2" height="14" rx="1"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="hint off" id="hint">Tap a box</div>
+
+  <!-- Title -->
+  <div class="overlay" id="title">
+    <svg class="hero" viewBox="40 70 980 1080" role="img" aria-label="An orange cat peeking over a checkbox">
+      <defs>
+        <mask id="hGap" maskUnits="userSpaceOnUse" x="0" y="0" width="1200" height="1200">
+          <rect width="1200" height="1200" fill="#fff"/>
+          <path d="M451 790 L585 935 L930 430" fill="none" stroke="#000" stroke-width="132"/>
+        </mask>
+      </defs>
+      <path d="M292 960 C190 965 140 890 170 820 C200 750 120 720 118 630" fill="none" stroke="#0E0E0E" stroke-width="70"/>
+      <circle cx="118" cy="630" r="35" fill="#0E0E0E"/>
+      <path d="M292 960 C190 965 140 890 170 820 C200 750 120 720 118 630" fill="none" stroke="#FF5A1F" stroke-width="46"/>
+      <path d="M192 952 l6 -34 M158 858 l32 -10 M166 760 l30 12" stroke="#C73C0C" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="118" cy="630" r="23" fill="#F2EEE6"/>
+      <rect x="290" y="480" width="620" height="620" rx="100" fill="none" stroke="#FF5A1F" stroke-width="52" mask="url(#hGap)"/>
+      <path d="M451 790 L585 935 L930 430" fill="none" stroke="#F2EEE6" stroke-width="76" stroke-linejoin="miter"/>
+      <g stroke="#0E0E0E" stroke-width="10" fill="#FF5A1F"><ellipse cx="440" cy="484" rx="56" ry="40"/><ellipse cx="600" cy="484" rx="56" ry="40"/></g>
+      <g stroke="#C73C0C" stroke-width="7" stroke-linecap="round"><path d="M422 488 v20 M446 492 v20 M594 492 v20 M618 488 v20"/></g>
+      <g stroke="#0E0E0E" stroke-width="26" stroke-linejoin="round" fill="#0E0E0E">
+        <polygon points="378,292 360,108 502,206"/><polygon points="662,292 680,108 538,206"/><ellipse cx="520" cy="322" rx="152" ry="126"/>
+      </g>
+      <g fill="#FF5A1F">
+        <polygon points="378,292 360,108 502,206"/><polygon points="662,292 680,108 538,206"/><ellipse cx="520" cy="322" rx="152" ry="126"/>
+      </g>
+      <polygon points="394,262 384,160 466,214" fill="#C73C0C"/><polygon points="646,262 656,160 574,214" fill="#C73C0C"/>
+      <g stroke="#C73C0C" stroke-width="13" stroke-linecap="round" fill="none">
+        <path d="M520 206 v52 M468 214 l12 40 M572 214 l-12 40 M382 292 l36 10 M378 330 l40 4 M658 292 l-36 10 M662 330 l-40 4"/>
+      </g>
+      <ellipse cx="520" cy="388" rx="80" ry="52" fill="#F2EEE6"/>
+      <ellipse cx="448" cy="316" rx="35" ry="39" fill="#F2EEE6"/><ellipse cx="592" cy="316" rx="35" ry="39" fill="#F2EEE6"/>
+      <ellipse cx="460" cy="327" rx="15" ry="28" fill="#0E0E0E"/><ellipse cx="604" cy="327" rx="15" ry="28" fill="#0E0E0E"/>
+      <circle cx="464" cy="315" r="6" fill="#F2EEE6"/><circle cx="608" cy="315" r="6" fill="#F2EEE6"/>
+      <path d="M408 288 L482 298 M632 288 L558 298" stroke="#0E0E0E" stroke-width="10" stroke-linecap="round"/>
+      <path d="M500 364 L540 364 L520 390 Z" fill="#0E0E0E" stroke="#0E0E0E" stroke-width="7" stroke-linejoin="round"/>
+      <path d="M520 392 v16 M520 408 q-24 24 -52 6 M520 408 q26 26 60 -6" fill="none" stroke="#0E0E0E" stroke-width="6.5" stroke-linecap="round"/>
+      <g stroke="#F2EEE6" stroke-width="5" stroke-linecap="round"><path d="M440 386 L292 350 M440 402 L286 410 M600 386 L748 350 M600 402 L754 410"/></g>
+    </svg>
+    <h1>Tick Cat</h1>
+    <p class="lede">Tap a box and the cat hops over to tick it before its outline runs out.</p>
+    <ul class="rules">
+      <li>Chain ticks for <b>×</b> bonus</li>
+      <li>Gold box pays <b>3</b></li>
+      <li>Miss <b>3</b> and it's over</li>
+    </ul>
+    <button class="primary" id="playBtn">Play</button>
+    <p class="tiny">Space or Enter also starts</p>
+  </div>
+
+  <!-- Paused -->
+  <div class="overlay" id="paused" hidden>
+    <h2>Paused</h2>
+    <button class="primary" id="resumeBtn">Resume</button>
+    <p class="tiny">Press P to resume</p>
+  </div>
+
+  <!-- Game over -->
+  <div class="overlay" id="over" hidden>
+    <span class="tag" id="overTag" hidden>New best</span>
+    <h2 id="overTitle">Out of checks</h2>
+    <div class="big-score" id="overScore">0</div>
+    <dl class="stats">
+      <div><dt>Ticks</dt><dd id="sTicks">0</dd></div>
+      <div><dt>Best streak</dt><dd id="sStreak">0</dd></div>
+      <div><dt>Best score</dt><dd id="sBest">0</dd></div>
+    </dl>
+    <button class="primary" id="againBtn">Play again</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const rootStyle = getComputedStyle(document.documentElement);
+  const tok = (n) => rootStyle.getPropertyValue(n).trim();
+  const COL = { bg: tok('--bg') || '#0E0E0E', ink: tok('--ink') || '#F2EEE6', orange: tok('--orange') || '#FF5A1F', deep: tok('--orange-deep') || '#C73C0C', dim: tok('--dim') || '#8F8678' };
+  const DISPLAY = '"Dela Gothic One", "Arial Black", Impact, system-ui, sans-serif';
+  const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- cat sprite ----------
+  const CAT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="200" height="240">
+    <path d="M138 208 C188 214 196 160 172 138" fill="none" stroke="#0E0E0E" stroke-width="30" stroke-linecap="round"/>
+    <path d="M138 208 C188 214 196 160 172 138" fill="none" stroke="#FF5A1F" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="172" cy="138" r="9" fill="#F2EEE6"/>
+    <path d="M52 216 C52 150 78 118 100 118 C122 118 148 150 148 216 Z" fill="#FF5A1F" stroke="#0E0E0E" stroke-width="8" stroke-linejoin="round"/>
+    <ellipse cx="100" cy="172" rx="20" ry="34" fill="#F2EEE6"/>
+    <path d="M70 160 l8 3 M70 176 l9 1 M130 160 l-8 3 M130 176 l-9 1" stroke="#C73C0C" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="82" cy="216" rx="18" ry="12" fill="#FF5A1F" stroke="#0E0E0E" stroke-width="6"/>
+    <ellipse cx="118" cy="216" rx="18" ry="12" fill="#FF5A1F" stroke="#0E0E0E" stroke-width="6"/>
+    <g stroke="#0E0E0E" stroke-width="14" stroke-linejoin="round" fill="#0E0E0E">
+      <polygon points="52,70 45,16 95,50"/><polygon points="148,70 155,16 105,50"/><ellipse cx="100" cy="92" rx="54" ry="46"/>
+    </g>
+    <g fill="#FF5A1F">
+      <polygon points="52,70 45,16 95,50"/><polygon points="148,70 155,16 105,50"/><ellipse cx="100" cy="92" rx="54" ry="46"/>
+    </g>
+    <polygon points="60,62 56,32 83,52" fill="#C73C0C"/><polygon points="140,62 144,32 117,52" fill="#C73C0C"/>
+    <path d="M100 48 v16 M84 52 l4 14 M116 52 l-4 14" stroke="#C73C0C" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <ellipse cx="100" cy="113" rx="29" ry="19" fill="#F2EEE6"/>
+    <ellipse cx="80" cy="93" rx="12" ry="14" fill="#F2EEE6"/><ellipse cx="120" cy="93" rx="12" ry="14" fill="#F2EEE6"/>
+    <ellipse cx="83" cy="96" rx="5.5" ry="10" fill="#0E0E0E"/><ellipse cx="123" cy="96" rx="5.5" ry="10" fill="#0E0E0E"/>
+    <circle cx="85" cy="92" r="2.6" fill="#F2EEE6"/><circle cx="125" cy="92" r="2.6" fill="#F2EEE6"/>
+    <path d="M66 83 L90 88 M134 83 L110 88" stroke="#0E0E0E" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M94 105 L106 105 L100 113 Z" fill="#0E0E0E" stroke="#0E0E0E" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M100 113 v6 M100 119 q-9 8 -19 2 M100 119 q10 9 21 -2" fill="none" stroke="#0E0E0E" stroke-width="3" stroke-linecap="round"/>
+    <g stroke="#F2EEE6" stroke-width="2.6" stroke-linecap="round"><path d="M72 112 L30 102 M72 119 L28 123 M128 112 L170 102 M128 119 L172 123"/></g>
+  </svg>`;
+  const catImg = new Image();
+  catImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(CAT_SVG);
+
+  // ---------- canvas ----------
+  const cv = $('c');
+  const ctx = cv.getContext('2d');
+  let W = 0, H = 0, dpr = 1, S = 80;
+
+  // ---------- state ----------
+  let state = 'title'; // title | playing | paused | over
+  let gt = 0;          // game clock, seconds
+  let boxes = [], parts = [], floats = [];
+  let score = 0, lives = 3, combo = 0, comboT = 0, ticks = 0, maxCombo = 0;
+  let spawnT = 0, shake = 0, nextId = 1, hintShown = true;
+  let best = 0;
+  try { best = parseInt(localStorage.getItem('tickcat.best') || '0', 10) || 0; } catch (e) {}
+  let muted = false;
+  try { muted = localStorage.getItem('tickcat.mute') === '1'; } catch (e) {}
+
+  const cat = { x: 0, y: 0, fx: 0, fy: 0, tx: 0, ty: 0, t: 0, dur: 0.3, arc: 60, hop: false, target: null, queue: [], land: 0, lean: 1 };
+
+  const COMBO_WINDOW = 2.2;
+  const LAND_TIME = 0.18;
+  const multOf = (c) => Math.min(5, 1 + Math.floor(c / 5));
+
+  // ---------- audio ----------
+  let actx = null;
+  function ensureAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+    if (actx && actx.state === 'suspended') { try { actx.resume(); } catch (e) {} }
+  }
+  function blip(freq, dur, type, vol, slide, delay) {
+    if (muted || !actx) return;
+    try {
+      const t = actx.currentTime + (delay || 0);
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type || 'triangle';
+      o.frequency.setValueAtTime(freq, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * slide), t + dur);
+      g.gain.setValueAtTime(vol || 0.08, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + dur + 0.03);
+    } catch (e) {}
+  }
+  const sfx = {
+    hop() { blip(280, 0.08, 'sine', 0.05, 1.7); },
+    tick(c, gold) {
+      const f = 520 * Math.pow(1.06, Math.min(c, 14));
+      blip(f, 0.09, 'triangle', 0.1);
+      blip(f * 1.5, 0.12, 'triangle', 0.07, 1, 0.07);
+      if (gold) blip(f * 2, 0.16, 'triangle', 0.07, 1, 0.14);
+    },
+    miss() { blip(170, 0.3, 'sawtooth', 0.07, 0.45); },
+    over() { blip(330, 0.18, 'triangle', 0.09, 0.7); blip(247, 0.22, 'triangle', 0.09, 0.7, 0.16); blip(165, 0.4, 'triangle', 0.09, 0.6, 0.34); },
+    start() { blip(392, 0.09, 'triangle', 0.08); blip(523, 0.12, 'triangle', 0.08, 1, 0.09); }
+  };
+
+  // ---------- helpers ----------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const easeOutBack = (t) => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+  const active = (b) => !b.ticked && !b.missed;
+
+  function bounds() {
+    return { x0: S * 0.85, x1: W - S * 0.85, y0: 58 + S * 1.6, y1: H - S * 0.5 - 20 };
+  }
+  const feet = (b) => ({ x: b.x, y: b.y - b.size / 2 + b.size * 0.14 });
+
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const nw = r.width, nh = r.height;
+    if (!nw || !nh) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.width = Math.round(nw * dpr);
+    cv.height = Math.round(nh * dpr);
+    if (W && H) {
+      const fx = nw / W, fy = nh / H;
+      for (const b of boxes) { b.x *= fx; b.y *= fy; }
+      cat.x *= fx; cat.y *= fy; cat.fx *= fx; cat.fy *= fy; cat.tx *= fx; cat.ty *= fy;
+      for (const p of parts) { p.x *= fx; p.y *= fy; }
+      for (const f of floats) { f.x *= fx; f.y *= fy; }
+    }
+    W = nw; H = nh;
+    S = Math.round(clamp(Math.min(W, H * 0.8) * 0.17, 56, 104));
+    for (const b of boxes) b.size = S;
+    if (state === 'title' || (!cat.x && !cat.y)) { cat.x = W / 2; cat.y = H * 0.66; }
+  }
+
+  // ---------- spawning ----------
+  function difficulty() {
+    return {
+      every: Math.max(0.5, 1.1 - gt * 0.009),
+      life: Math.max(1.6, 4.4 - gt * 0.028),
+      max: Math.min(8, 4 + Math.floor(gt / 15))
+    };
+  }
+  function spawnBox() {
+    const d = difficulty();
+    const bd = bounds();
+    if (bd.x1 <= bd.x0 || bd.y1 <= bd.y0) return false;
+    for (let i = 0; i < 40; i++) {
+      const x = rand(bd.x0, bd.x1), y = rand(bd.y0, bd.y1);
+      let ok = true;
+      for (const o of boxes) {
+        if (o.ticked || o.missed) continue;
+        if (Math.abs(o.x - x) < S * 1.4 && Math.abs(o.y - y) < S * 1.95) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const gold = gt > 8 && Math.random() < 0.13;
+      boxes.push({ id: nextId++, x, y, size: S, born: gt, life: d.life * (gold ? 0.75 : 1), gold, ticked: false, tickAt: 0, missed: false, missAt: 0 });
+      return true;
+    }
+    return false;
+  }
+
+  // ---------- cat ----------
+  function startHop(b) {
+    const p = feet(b);
+    cat.fx = cat.x; cat.fy = cat.y; cat.tx = p.x; cat.ty = p.y;
+    const dist = Math.hypot(cat.tx - cat.fx, cat.ty - cat.fy);
+    cat.dur = Math.max(0.15, 0.12 + dist / 2000);
+    cat.arc = Math.min(130, 36 + dist * 0.18);
+    cat.t = 0; cat.hop = true; cat.target = b;
+    cat.lean = Math.sign(cat.tx - cat.fx) || 1;
+    sfx.hop();
+  }
+  function command(b) {
+    if (b === cat.target || cat.queue.includes(b)) return;
+    if (!cat.hop) startHop(b);
+    else if (cat.queue.length < 2) cat.queue.push(b);
+  }
+  function nextQueued() {
+    while (cat.queue.length) {
+      const nb = cat.queue.shift();
+      if (active(nb)) { startHop(nb); return; }
+    }
+    cat.target = null;
+  }
+  function updateCat(dt) {
+    if (cat.hop) {
+      cat.t += dt / cat.dur;
+      if (cat.t >= 1) {
+        cat.t = 1; cat.hop = false; cat.x = cat.tx; cat.y = cat.ty; cat.land = LAND_TIME;
+        const b = cat.target;
+        if (b && active(b)) tickBox(b);
+        nextQueued();
+      } else {
+        cat.x = cat.fx + (cat.tx - cat.fx) * cat.t;
+        cat.y = cat.fy + (cat.ty - cat.fy) * cat.t - cat.arc * 4 * cat.t * (1 - cat.t);
+      }
+    }
+    if (cat.land > 0) cat.land = Math.max(0, cat.land - dt);
+  }
+
+  // ---------- scoring ----------
+  function tickBox(b) {
+    b.ticked = true; b.tickAt = gt;
+    const before = multOf(combo);
+    combo++; comboT = COMBO_WINDOW; ticks++;
+    if (combo > maxCombo) maxCombo = combo;
+    const m = multOf(combo);
+    const pts = (b.gold ? 3 : 1) * m;
+    score += pts;
+    sfx.tick(combo, b.gold);
+    burst(b.x, b.y, b.gold);
+    floats.push({ x: b.x, y: b.y - b.size * 0.2, txt: '+' + pts, age: 0, life: 0.8, col: b.gold ? COL.ink : COL.orange, size: b.gold ? 30 : 24 });
+    if (m > before) floats.push({ x: b.x, y: b.y - b.size * 0.85, txt: '×' + m + '!', age: 0, life: 1, col: COL.ink, size: 28 });
+    if (hintShown) { hintShown = false; $('hint').classList.add('off'); }
+    hud(true);
+  }
+  function loseLife() {
+    lives--; combo = 0; comboT = 0;
+    shake = REDUCED ? 0 : 0.3;
+    sfx.miss();
+    hud(false);
+    if (lives <= 0) endGame();
+  }
+
+  function burst(x, y, gold) {
+    const n = REDUCED ? 4 : 11;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rand(-0.2, 0.2), sp = rand(140, 320);
+      parts.push({ type: 'sq', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 60, age: 0, life: rand(0.35, 0.6), size: rand(5, 9), col: (i % 3 === 0 || gold) ? COL.ink : COL.orange });
+    }
+    parts.push({ type: 'ring', x, y, age: 0, life: 0.4, size: S, col: gold ? COL.ink : COL.orange });
+  }
+
+  // ---------- game flow ----------
+  function setOverlay(name) {
+    $('hud').style.visibility = name === 'title' ? 'hidden' : 'visible';
+    $('title').hidden = name !== 'title';
+    $('paused').hidden = name !== 'paused';
+    $('over').hidden = name !== 'over';
+  }
+  function startGame() {
+    ensureAudio();
+    boxes = []; parts = []; floats = [];
+    score = 0; lives = 3; combo = 0; comboT = 0; ticks = 0; maxCombo = 0; gt = 0; shake = 0;
+    cat.queue = []; cat.target = null; cat.hop = false; cat.land = 0;
+    cat.x = W / 2; cat.y = H * 0.66;
+    spawnT = 0.9;
+    spawnBox(); spawnBox();
+    hintShown = true; $('hint').classList.remove('off');
+    state = 'playing';
+    setOverlay(null);
+    hud(false);
+    sfx.start();
+  }
+  function endGame() {
+    state = 'over';
+    const isBest = score > best;
+    if (isBest) { best = score; try { localStorage.setItem('tickcat.best', String(best)); } catch (e) {} }
+    sfx.over();
+    setTimeout(() => {
+      if (state !== 'over') return;
+      $('overScore').textContent = score;
+      $('sTicks').textContent = ticks;
+      $('sStreak').textContent = maxCombo;
+      $('sBest').textContent = best;
+      $('overTag').hidden = !(isBest && score > 0);
+      $('overTitle').textContent = isBest && score > 0 ? 'Nice run' : 'Out of checks';
+      setOverlay('over');
+      $('againBtn').focus({ preventScroll: true });
+    }, 650);
+    hud(false);
+  }
+  function pause() {
+    if (state !== 'playing') return;
+    state = 'paused'; setOverlay('paused');
+    $('resumeBtn').focus({ preventScroll: true });
+  }
+  function resume() {
+    if (state !== 'paused') return;
+    state = 'playing'; setOverlay(null); last = performance.now();
+  }
+
+  // ---------- HUD ----------
+  const LIFE_SVG = '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="#FF5A1F" stroke-width="3"/><path d="M7 12.5 L10.6 16 L18.5 6" fill="none" stroke="#F2EEE6" stroke-width="3.2"/></svg>';
+  const SND_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>';
+  const SND_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>';
+  function hud(bump) {
+    const s = $('score');
+    s.textContent = score;
+    if (bump) { s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
+    $('best').textContent = Math.max(best, score);
+    const lv = $('lives');
+    let html = '';
+    for (let i = 0; i < 3; i++) html += '<span class="life' + (i >= lives ? ' lost' : '') + '">' + LIFE_SVG + '</span>';
+    lv.innerHTML = html;
+    const m = multOf(combo);
+    $('combo').hidden = !(m > 1 && comboT > 0);
+    $('mult').textContent = '×' + m;
+  }
+  function paintMute() {
+    const b = $('muteBtn');
+    b.innerHTML = muted ? SND_OFF : SND_ON;
+    b.setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
+  }
+
+  // ---------- drawing ----------
+  function rrPath(cx, cy, w, h, r) {
+    const x = cx - w / 2, y = cy - h / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+  function polyline(pts, prog) {
+    // draw a polyline up to `prog` (0..1) of its length
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    let left = total * prog;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) {
+      const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      if (left >= seg) { ctx.lineTo(pts[i][0], pts[i][1]); left -= seg; }
+      else { const k = left / seg; ctx.lineTo(pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * k, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * k); break; }
+    }
+    ctx.stroke();
+  }
+  function drawBox(b) {
+    const s = b.size;
+    const age = gt - b.born;
+    let sc = 1, alpha = 1, ox = 0;
+    const sp = clamp(age / 0.24, 0, 1);
+    if (sp < 1) sc = 0.35 + 0.65 * easeOutBack(sp);
+    if (b.ticked) {
+      const k = gt - b.tickAt;
+      sc *= 1 + 0.16 * Math.sin(clamp(k / 0.26, 0, 1) * Math.PI);
+      alpha = 1 - clamp((k - 0.25) / 0.3, 0, 1);
+    }
+    if (b.missed) {
+      const k = gt - b.missAt;
+      ox = Math.sin(k * 60) * 5 * (1 - clamp(k / 0.35, 0, 1));
+      alpha = 1 - clamp((k - 0.35) / 0.3, 0, 1);
+    }
+    if (alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(b.x + ox, b.y);
+    ctx.scale(sc, sc);
+    const lw = s * 0.13, r = s * 0.26, w = s - lw, L = 2 * (w + w) - 8 * r + 2 * Math.PI * r;
+    // interior (warms up briefly when ticked)
+    rrPath(0, 0, w, w, r);
+    ctx.fillStyle = 'rgba(14,14,14,0.62)';
+    ctx.fill();
+    if (b.ticked) {
+      ctx.fillStyle = 'rgba(255,90,31,' + (0.32 * (1 - clamp((gt - b.tickAt) / 0.35, 0, 1))).toFixed(3) + ')';
+      ctx.fill();
+    }
+    // track
+    ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = b.gold ? 'rgba(242,238,230,0.16)' : 'rgba(199,60,12,0.4)';
+    ctx.stroke();
+    // remaining time
+    const frac = b.ticked ? 1 : b.missed ? 0 : clamp(1 - age / b.life, 0, 1);
+    if (frac > 0.012) {
+      const danger = !b.ticked && frac < 0.3 && Math.floor(gt * 8) % 2 === 0;
+      let col = b.gold ? COL.ink : COL.orange;
+      if (danger) col = b.gold ? COL.orange : COL.ink;
+      ctx.strokeStyle = col;
+      ctx.setLineDash([L * frac, L + 10]);
+      rrPath(0, 0, w, w, r);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // contents
+    if (b.ticked) {
+      const p = clamp((gt - b.tickAt) / 0.16, 0, 1);
+      ctx.lineWidth = s * 0.16; ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+      ctx.strokeStyle = b.gold ? COL.orange : COL.ink;
+      polyline([[-0.27 * s, 0.0], [-0.07 * s, 0.2 * s], [0.29 * s, -0.27 * s]], p);
+    } else if (b.missed) {
+      const p = clamp((gt - b.missAt) / 0.14, 0, 1);
+      ctx.lineWidth = s * 0.13; ctx.lineCap = 'round';
+      ctx.strokeStyle = COL.dim;
+      polyline([[-0.2 * s, -0.2 * s], [0.2 * s, 0.2 * s]], p);
+      polyline([[0.2 * s, -0.2 * s], [-0.2 * s, 0.2 * s]], p);
+    } else {
+      ctx.lineWidth = s * 0.12; ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+      ctx.strokeStyle = 'rgba(242,238,230,0.07)';
+      polyline([[-0.27 * s, 0.0], [-0.07 * s, 0.2 * s], [0.29 * s, -0.27 * s]], 1);
+      if (b.gold) {
+        ctx.fillStyle = 'rgba(242,238,230,0.5)';
+        ctx.font = (s * 0.2) + 'px ' + DISPLAY;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('+3', 0, s * 0.3);
+      }
+    }
+    ctx.restore();
+    // marker for boxes the cat is heading to
+    if (active(b) && (b === cat.target || cat.queue.includes(b))) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(242,238,230,0.55)';
+      ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
+      ctx.lineDashOffset = -gt * 30;
+      rrPath(b.x, b.y, s * 1.2, s * 1.2, s * 0.34);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  function drawCat(time) {
+    if (!catImg.complete || !catImg.naturalWidth) return;
+    const h = S * 1.5, w = h * 200 / 240;
+    let sx = 1, sy = 1, rot = 0;
+    let gx = cat.x, gy = cat.y, lift = 0;
+    if (cat.hop) {
+      const sn = Math.sin(Math.PI * cat.t);
+      sx = 1 - 0.1 * sn; sy = 1 + 0.15 * sn;
+      rot = cat.lean * 0.14 * sn;
+      gx = cat.fx + (cat.tx - cat.fx) * cat.t;
+      gy = cat.fy + (cat.ty - cat.fy) * cat.t;
+      lift = cat.arc * 4 * cat.t * (1 - cat.t);
+    } else {
+      sy = 1 + 0.012 * Math.sin(time * 3.2);
+      if (cat.land > 0) { const l = cat.land / LAND_TIME; sx = 1 + 0.2 * l; sy = 1 - 0.22 * l; }
+    }
+    // shadow
+    ctx.save();
+    ctx.globalAlpha = 0.35 * (1 - clamp(lift / 150, 0, 0.8));
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(gx, gy + 2, S * 0.42 * (1 - clamp(lift / 260, 0, 0.4)), S * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // body
+    ctx.save();
+    ctx.translate(cat.x, cat.y + 6);
+    ctx.rotate(rot);
+    ctx.scale(sx, sy);
+    ctx.drawImage(catImg, -w / 2, -h * 0.965, w, h);
+    ctx.restore();
+  }
+  function drawParts(dt) {
+    for (const p of parts) {
+      p.age += dt;
+      if (p.type === 'sq') {
+        p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        const a = 1 - p.age / p.life;
+        if (a <= 0) continue;
+        ctx.globalAlpha = a; ctx.fillStyle = p.col;
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+      } else {
+        const k = p.age / p.life;
+        if (k >= 1) continue;
+        ctx.globalAlpha = (1 - k) * 0.8; ctx.strokeStyle = p.col; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + 0.75 * k), 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    parts = parts.filter((p) => p.age < p.life);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const f of floats) {
+      f.age += dt;
+      const k = f.age / f.life;
+      if (k >= 1) continue;
+      ctx.globalAlpha = 1 - Math.pow(k, 2);
+      ctx.fillStyle = f.col;
+      ctx.font = f.size + 'px ' + DISPLAY;
+      ctx.strokeStyle = COL.bg; ctx.lineWidth = 5; ctx.lineJoin = 'round';
+      const y = f.y - 46 * (1 - Math.pow(1 - k, 2));
+      ctx.strokeText(f.txt, f.x, y);
+      ctx.fillText(f.txt, f.x, y);
+    }
+    ctx.globalAlpha = 1;
+    floats = floats.filter((f) => f.age < f.life);
+  }
+
+  // ---------- main loop ----------
+  let last = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (!W) { resize(); if (!W) return; }
+
+    if (state === 'playing') {
+      gt += dt;
+      // spawning
+      const d = difficulty();
+      spawnT -= dt;
+      const act = boxes.filter(active).length;
+      if (act === 0 && spawnT > 0.25) spawnT = 0.25;
+      if (spawnT <= 0) {
+        if (act < d.max && spawnBox()) spawnT = d.every * rand(0.8, 1.2);
+        else spawnT = 0.15;
+      }
+      // box expiry
+      for (const b of boxes) {
+        if (active(b) && gt - b.born >= b.life) {
+          b.missed = true; b.missAt = gt;
+          loseLife();
+          if (state !== 'playing') break;
+        }
+      }
+      // combo timer
+      if (comboT > 0) {
+        comboT -= dt;
+        if (comboT <= 0) { comboT = 0; combo = 0; hud(false); }
+        else { $('cbar').style.transform = 'scaleX(' + (comboT / COMBO_WINDOW).toFixed(3) + ')'; }
+      }
+      updateCat(dt);
+    } else if (state === 'over') {
+      gt += dt * 0.5;
+      updateCat(dt);
+    }
+    boxes = boxes.filter((b) => !(b.ticked && gt - b.tickAt > 0.6) && !(b.missed && gt - b.missAt > 0.7));
+    if (shake > 0) shake = Math.max(0, shake - dt);
+
+    // draw
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (shake > 0) ctx.translate(rand(-1, 1) * 9 * (shake / 0.3), rand(-1, 1) * 9 * (shake / 0.3));
+    const sorted = boxes.slice().sort((a, b) => a.y - b.y);
+    for (const b of sorted) drawBox(b);
+    if (state !== 'title') drawCat(now / 1000);
+    drawParts(state === 'paused' ? 0 : dt);
+    ctx.restore();
+  }
+
+  // ---------- input ----------
+  function pick(px, py) {
+    let best = null, bd = Infinity;
+    for (const b of boxes) {
+      if (!active(b)) continue;
+      const half = b.size / 2 + 14;
+      const dx = Math.abs(px - b.x), dy = Math.abs(py - b.y);
+      if (dx <= half && dy <= half) {
+        const d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = b; }
+      }
+    }
+    return best;
+  }
+  cv.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (state !== 'playing') return;
+    ensureAudio();
+    const r = cv.getBoundingClientRect();
+    const b = pick(e.clientX - r.left, e.clientY - r.top);
+    if (b) command(b);
+  });
+  $('playBtn').addEventListener('click', startGame);
+  $('againBtn').addEventListener('click', startGame);
+  $('resumeBtn').addEventListener('click', resume);
+  $('pauseBtn').addEventListener('click', () => (state === 'playing' ? pause() : resume()));
+  $('muteBtn').addEventListener('click', () => {
+    muted = !muted;
+    try { localStorage.setItem('tickcat.mute', muted ? '1' : '0'); } catch (e) {}
+    ensureAudio(); paintMute();
+  });
+  window.addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (k === 'p' || k === 'P' || k === 'Escape') { if (state === 'playing') pause(); else if (state === 'paused') resume(); return; }
+    if (k === 'm' || k === 'M') { $('muteBtn').click(); return; }
+    if ((k === ' ' || k === 'Enter') && (state === 'title' || state === 'over') && document.activeElement && document.activeElement.tagName !== 'BUTTON') {
+      e.preventDefault();
+      if (state === 'title' || !$('over').hidden) startGame();
+    }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  window.addEventListener('blur', pause);
+  window.addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe($('app'));
+
+  // ---------- boot ----------
+  paintMute();
+  hud(false);
+  setOverlay('title');
+  $('best').textContent = best;
+  resize();
+  requestAnimationFrame(frame);
+
+  // test hook
+  window.__tickcat = {
+    get state() { return state; }, get score() { return score; }, get lives() { return lives; },
+    get boxes() { return boxes.map((b) => ({ x: b.x, y: b.y, size: b.size, gold: b.gold, active: active(b) })); },
+    get cat() { return { x: cat.x, y: cat.y, hop: cat.hop }; }
+  };
+})();
+</script>
+
+</body>
+</html>
