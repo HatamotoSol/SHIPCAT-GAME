@@ -3,7 +3,7 @@
 A small arcade game in a single HTML file. An orange cat hops between checkboxes and ticks them before their outlines burn out. Chain ticks for a multiplier, grab gold boxes for bonus points, and survive as long as you can.
 
 **Community:** [Join the X community](https://x.com/i/communities/1974725158540574780)  
-**CA:** coming soon
+**CA:** 4vFXRCwsWZZm3md2VYJY5iA3FawDiGWArMkxcsrV3wmM
 
 ## Play
 
