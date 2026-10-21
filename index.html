@@ -123,6 +123,44 @@
   .stats div { min-width: 0; }
   .stats dt { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
   .stats dd { margin: 2px 0 0; font-family: var(--display); font-size: 26px; font-variant-numeric: tabular-nums; }
+  /* Home-screen wallet controls only; gameplay UI remains unchanged. */
+  .wallet-panel {
+    width: min(100%, 390px); display: grid; gap: 9px; padding: 12px;
+    border: 1.5px solid var(--line); border-radius: 16px;
+    background: rgba(23, 21, 19, 0.88); text-align: center; margin-inline: auto;
+  }
+  .wallet-heading { display: flex; justify-content: center; align-items: center; gap: 10px; text-align: center; }
+  .wallet-heading strong { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .wallet-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .wallet-btn {
+    flex: 1 1 100px; min-width: 0; border: 1.5px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; background: #201c18; color: var(--ink); font: inherit;
+    font-weight: 700; cursor: pointer;
+  }
+  .wallet-btn:hover { border-color: var(--orange); }
+  .wallet-btn.primary-wallet { background: var(--orange); border-color: var(--orange); color: var(--bg); }
+  .wallet-btn.other-wallet { flex: 0 0 auto; padding: 6px 10px; font-size: 12px; border-radius: 8px; opacity: 0.9; }
+  .wallet-btn:disabled { opacity: 0.55; cursor: wait; }
+  .wallet-status { margin: 0; color: var(--dim); font-size: 12px; overflow-wrap: anywhere; text-align: center; }
+  .wallet-status.connected { color: #9bd6a4; }
+  .wallet-status.error { color: #ff9b7a; }
+  .guest-modal {
+    position: absolute; inset: 0; z-index: 10; display: grid; place-items: center;
+    padding: 20px; background: rgba(10, 9, 8, 0.88);
+  }
+  .guest-card {
+    width: min(100%, 420px); display: grid; gap: 14px; padding: 22px;
+    border: 1.5px solid var(--line); border-radius: 18px; background: #171513;
+    box-shadow: 0 18px 60px rgba(0,0,0,.4); text-align: center;
+  }
+  .guest-card p { margin: 0; color: var(--dim); font-size: 14px; }
+  .guest-input {
+    width: 100%; box-sizing: border-box; border: 1.5px solid var(--line); border-radius: 10px;
+    padding: 13px 12px; background: #0e0d0c; color: var(--ink); font: inherit; font-size: 14px;
+  }
+  .guest-input:focus { outline: 2px solid var(--orange); outline-offset: 2px; }
+  .guest-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+  .guest-error { color: #ff9b7a !important; min-height: 1em; }
   .tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bg); background: var(--ink); padding: 5px 12px; border-radius: 999px; }
 
   @media (max-height: 560px) {
@@ -205,8 +243,32 @@
       <li>Gold box pays <b>3</b></li>
       <li>Miss <b>3</b> and it's over</li>
     </ul>
+    <section class="wallet-panel" aria-label="Wallet settings">
+      <div class="wallet-heading">
+        <strong>Wallet settings</strong>
+      </div>
+      <div class="wallet-actions">
+        <button class="wallet-btn primary-wallet" id="connectWalletBtn" type="button">Phantom</button>
+        <button class="wallet-btn" id="connectSolflareBtn" type="button">Solflare</button>
+        <button class="wallet-btn other-wallet" id="connectOtherWalletBtn" type="button">Other wallets</button>
+        <button class="wallet-btn" id="disconnectWalletBtn" type="button" hidden>Disconnect</button>
+      </div>
+      <p class="wallet-status" id="walletStatus" role="status" aria-live="polite">Optional · Connect a Solana wallet before playing.</p>
+    </section>
     <button class="primary" id="playBtn">Play</button>
-    <p class="tiny">Space or Enter also starts</p>
+    <p class="tiny">Space or Enter to play</p>
+    <div class="guest-modal" id="guestModal" hidden>
+      <section class="guest-card" role="dialog" aria-modal="true" aria-labelledby="guestTitle">
+        <h2 id="guestTitle">Play as guest</h2>
+        <p>Paste your Solana wallet address to continue. No wallet extension needed.</p>
+        <input class="guest-input" id="guestWalletAddress" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Paste Solana wallet address" aria-label="Solana wallet address" />
+        <p class="guest-error" id="guestWalletError" role="alert"></p>
+        <div class="guest-actions">
+          <button class="wallet-btn" id="cancelGuestBtn" type="button">Cancel</button>
+          <button class="primary" id="continueGuestBtn" type="button">Continue</button>
+        </div>
+      </section>
+    </div>
     <div class="links">
       <a class="chip" href="https://x.com/i/communities/1974725158540574780" target="_blank" rel="noopener noreferrer">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
@@ -786,7 +848,157 @@
     const b = pick(e.clientX - r.left, e.clientY - r.top);
     if (b) command(b);
   });
-  $('playBtn').addEventListener('click', startGame);
+
+  // ---------- optional home-screen Solana wallet connection ----------
+  // This static HTML integration connects to wallet extensions only. It does not
+  // request signatures, send transactions, or change gameplay.
+  const connectWalletBtn = $('connectWalletBtn');
+  const connectSolflareBtn = $('connectSolflareBtn');
+  const connectOtherWalletBtn = $('connectOtherWalletBtn');
+  const disconnectWalletBtn = $('disconnectWalletBtn');
+  const walletConnectButtons = [connectWalletBtn, connectSolflareBtn, connectOtherWalletBtn];
+  const walletStatus = $('walletStatus');
+  let connectedWalletProvider = null;
+  let connectedWalletName = '';
+  let walletAccountHandler = null;
+
+  function shortAddress(address) {
+    return address && address.length > 12 ? address.slice(0, 5) + '…' + address.slice(-5) : (address || '');
+  }
+
+  function setWalletStatus(message, kind) {
+    walletStatus.textContent = message;
+    walletStatus.classList.toggle('connected', kind === 'connected');
+    walletStatus.classList.toggle('error', kind === 'error');
+  }
+
+  function findWalletProvider(choice) {
+    const phantom = window.phantom && window.phantom.solana;
+    const solflare = window.solflare;
+    if (choice === 'Phantom') {
+      if (phantom && phantom.isPhantom) return phantom;
+      if (window.solana && window.solana.isPhantom) return window.solana;
+      return null;
+    }
+    if (choice === 'Solflare') {
+      if (solflare && (solflare.isSolflare || typeof solflare.connect === 'function')) return solflare;
+      return null;
+    }
+    if (choice === 'Other wallets') {
+      const candidates = [
+        window.backpack && window.backpack.solana,
+        window.glow && window.glow.solana,
+        window.jupiter && window.jupiter.solana,
+        window.solana && !window.solana.isPhantom ? window.solana : null
+      ];
+      return candidates.find((provider) => provider && typeof provider.connect === 'function') || null;
+    }
+    return null;
+  }
+
+  function updateWalletUI(address) {
+    const connected = Boolean(address);
+    walletConnectButtons.forEach((button) => { button.hidden = connected; });
+    disconnectWalletBtn.hidden = !connected;
+    if (connected) {
+      setWalletStatus(connectedWalletName + ' connected · ' + shortAddress(address), 'connected');
+    } else {
+      setWalletStatus('Optional · Connect a Solana wallet before playing.');
+    }
+  }
+
+  async function connectWallet(choice) {
+    walletConnectButtons.forEach((button) => { button.disabled = true; });
+    try {
+      const provider = findWalletProvider(choice);
+      if (!provider) {
+        setWalletStatus(choice === 'Other wallets'
+          ? 'No compatible injected wallet was detected. Open your wallet extension and try again.'
+          : choice + ' was not detected. Install or unlock the wallet extension, then try again.', 'error');
+        return;
+      }
+      if (connectedWalletProvider && connectedWalletProvider !== provider) {
+        try { await connectedWalletProvider.disconnect(); } catch (e) {}
+      }
+      const response = await provider.connect();
+      const publicKey = (response && response.publicKey) || provider.publicKey;
+      if (!publicKey) throw new Error('The wallet did not return a public address.');
+      connectedWalletProvider = provider;
+      connectedWalletName = choice;
+      const address = typeof publicKey.toBase58 === 'function' ? publicKey.toBase58() : String(publicKey);
+      updateWalletUI(address);
+
+      if (walletAccountHandler && provider.removeListener) {
+        provider.removeListener('accountChanged', walletAccountHandler);
+      }
+      walletAccountHandler = (key) => {
+        if (!key) {
+          connectedWalletProvider = null;
+          connectedWalletName = '';
+          updateWalletUI('');
+          return;
+        }
+        const nextAddress = typeof key.toBase58 === 'function' ? key.toBase58() : String(key);
+        updateWalletUI(nextAddress);
+      };
+      if (provider.on) provider.on('accountChanged', walletAccountHandler);
+    } catch (error) {
+      const message = error && error.message ? error.message : 'Wallet connection failed.';
+      setWalletStatus(message, 'error');
+    } finally {
+      walletConnectButtons.forEach((button) => { button.disabled = false; });
+    }
+  }
+
+  connectWalletBtn.addEventListener('click', () => connectWallet('Phantom'));
+  connectSolflareBtn.addEventListener('click', () => connectWallet('Solflare'));
+  connectOtherWalletBtn.addEventListener('click', () => connectWallet('Other wallets'));
+
+
+  disconnectWalletBtn.addEventListener('click', async () => {
+    const provider = connectedWalletProvider;
+    if (provider && walletAccountHandler && provider.removeListener) {
+      provider.removeListener('accountChanged', walletAccountHandler);
+    }
+    connectedWalletProvider = null;
+    connectedWalletName = '';
+    walletAccountHandler = null;
+    try { if (provider && provider.disconnect) await provider.disconnect(); } catch (e) {}
+    updateWalletUI('');
+  });
+
+
+  const guestModal = $('guestModal');
+  const guestWalletInput = $('guestWalletAddress');
+  const guestWalletError = $('guestWalletError');
+  // Guest mode accepts a pasted public address; it does not prove wallet ownership.
+  window.shipcatGuestWalletAddress = '';
+  function openGuestModal() {
+    guestWalletError.textContent = '';
+    guestModal.hidden = false;
+    guestWalletInput.value = window.shipcatGuestWalletAddress || '';
+    setTimeout(() => guestWalletInput.focus(), 0);
+  }
+  function closeGuestModal() { guestModal.hidden = true; }
+  function continueAsGuest() {
+    const address = guestWalletInput.value.trim();
+    // Solana public keys use base58 characters and are typically 32–44 characters long.
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
+      guestWalletError.textContent = 'Enter a valid-looking Solana wallet address (32–44 characters).';
+      guestWalletInput.focus();
+      return;
+    }
+    window.shipcatGuestWalletAddress = address;
+    closeGuestModal();
+    startGame();
+  }
+  $('playBtn').addEventListener('click', openGuestModal);
+  $('cancelGuestBtn').addEventListener('click', closeGuestModal);
+  $('continueGuestBtn').addEventListener('click', continueAsGuest);
+  guestWalletInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); continueAsGuest(); }
+    if (event.key === 'Escape') closeGuestModal();
+  });
   $('againBtn').addEventListener('click', startGame);
   $('resumeBtn').addEventListener('click', resume);
   $('pauseBtn').addEventListener('click', () => (state === 'playing' ? pause() : resume()));
@@ -801,7 +1013,7 @@
     if (k === 'm' || k === 'M') { $('muteBtn').click(); return; }
     if ((k === ' ' || k === 'Enter') && (state === 'title' || state === 'over') && document.activeElement && document.activeElement.tagName !== 'BUTTON' && document.activeElement.tagName !== 'A') {
       e.preventDefault();
-      if (state === 'title' || !$('over').hidden) startGame();
+      if (state === 'title') openGuestModal(); else if (!$('over').hidden) startGame();
     }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
