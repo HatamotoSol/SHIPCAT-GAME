@@ -154,6 +154,8 @@
     box-shadow: 0 18px 60px rgba(0,0,0,.4); text-align: center;
   }
   .guest-card p { margin: 0; color: var(--dim); font-size: 14px; }
+  .other-wallet-list { display: grid; gap: 8px; }
+  .other-wallet-list .wallet-btn { width: 100%; }
   .guest-input {
     width: 100%; box-sizing: border-box; border: 1.5px solid var(--line); border-radius: 10px;
     padding: 13px 12px; background: #0e0d0c; color: var(--ink); font: inherit; font-size: 14px;
@@ -266,6 +268,17 @@
         <div class="guest-actions">
           <button class="wallet-btn" id="cancelGuestBtn" type="button">Cancel</button>
           <button class="primary" id="continueGuestBtn" type="button">Continue</button>
+        </div>
+      </section>
+    </div>
+    <div class="guest-modal" id="otherWalletModal" hidden>
+      <section class="guest-card" role="dialog" aria-modal="true" aria-labelledby="otherWalletTitle">
+        <h2 id="otherWalletTitle">Other wallets</h2>
+        <p id="otherWalletDescription">Choose a compatible Solana wallet installed in this browser.</p>
+        <div class="other-wallet-list" id="otherWalletList"></div>
+        <p class="guest-error" id="otherWalletError" role="status"></p>
+        <div class="guest-actions">
+          <button class="wallet-btn" id="closeOtherWalletsBtn" type="button">Close</button>
         </div>
       </section>
     </div>
@@ -873,27 +886,65 @@
   }
 
   function findWalletProvider(choice) {
-    const phantom = window.phantom && window.phantom.solana;
-    const solflare = window.solflare;
-    if (choice === 'Phantom') {
-      if (phantom && phantom.isPhantom) return phantom;
-      if (window.solana && window.solana.isPhantom) return window.solana;
-      return null;
-    }
+    const solana = window.solana;
+    const providers = (solana && Array.isArray(solana.providers)) ? solana.providers : [];
+    const phantomCandidates = [window.phantom && window.phantom.solana, ...providers, solana].filter(Boolean);
+    const phantom = phantomCandidates.find((provider) => provider.isPhantom === true);
+    const solflare = window.solflare || (solana && solana.isSolflare ? solana : null);
+    if (choice === 'Phantom') return phantom || null;
     if (choice === 'Solflare') {
-      if (solflare && (solflare.isSolflare || typeof solflare.connect === 'function')) return solflare;
-      return null;
-    }
-    if (choice === 'Other wallets') {
-      const candidates = [
-        window.backpack && window.backpack.solana,
-        window.glow && window.glow.solana,
-        window.jupiter && window.jupiter.solana,
-        window.solana && !window.solana.isPhantom ? window.solana : null
-      ];
-      return candidates.find((provider) => provider && typeof provider.connect === 'function') || null;
+      return solflare && (solflare.isSolflare || typeof solflare.connect === 'function') ? solflare : null;
     }
     return null;
+  }
+
+  function getOtherWalletProviders() {
+    const found = [];
+    const add = (name, provider) => {
+      if (!provider || typeof provider.connect !== 'function' || found.some((item) => item.provider === provider)) return;
+      found.push({ name, provider });
+    };
+    const solana = window.solana;
+    const providers = (solana && Array.isArray(solana.providers)) ? solana.providers : [];
+    providers.forEach((provider) => {
+      if (provider.isPhantom) add('Phantom', provider);
+      else if (provider.isSolflare) add('Solflare', provider);
+      else if (provider.isBackpack) add('Backpack', provider);
+      else if (provider.isGlow) add('Glow', provider);
+      else if (provider.isNightly) add('Nightly', provider);
+      else add(provider.name || 'Detected Solana wallet', provider);
+    });
+    add('Backpack', window.backpack && (window.backpack.solana || window.backpack));
+    add('Glow', window.glow && (window.glow.solana || window.glow));
+    add('Jupiter', window.jupiter && (window.jupiter.solana || window.jupiter));
+    add('Nightly', window.nightly && (window.nightly.solana || window.nightly));
+    add('Solflare', window.solflare);
+    add('Phantom', window.phantom && window.phantom.solana);
+    if (solana && !solana.isPhantom && !solana.isSolflare) add(solana.name || 'Browser Solana wallet', solana);
+    return found;
+  }
+
+  function openOtherWalletsModal() {
+    const modal = $('otherWalletModal');
+    const list = $('otherWalletList');
+    const error = $('otherWalletError');
+    list.replaceChildren();
+    error.textContent = '';
+    const providers = getOtherWalletProviders();
+    if (!providers.length) {
+      $('otherWalletDescription').textContent = 'No compatible wallet extension was detected. Install or unlock a Solana wallet extension, then try again. You can also use Play to continue as a guest.';
+    } else {
+      $('otherWalletDescription').textContent = 'Select a detected wallet to connect.';
+      providers.forEach(({ name, provider }) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'wallet-btn';
+        button.textContent = name;
+        button.addEventListener('click', () => connectWallet(name, provider));
+        list.appendChild(button);
+      });
+    }
+    modal.hidden = false;
   }
 
   function updateWalletUI(address) {
@@ -907,14 +958,12 @@
     }
   }
 
-  async function connectWallet(choice) {
+  async function connectWallet(choice, selectedProvider) {
     walletConnectButtons.forEach((button) => { button.disabled = true; });
     try {
-      const provider = findWalletProvider(choice);
+      const provider = selectedProvider || findWalletProvider(choice);
       if (!provider) {
-        setWalletStatus(choice === 'Other wallets'
-          ? 'No compatible injected wallet was detected. Open your wallet extension and try again.'
-          : choice + ' was not detected. Install or unlock the wallet extension, then try again.', 'error');
+        setWalletStatus(choice + ' was not detected. Install or unlock the wallet extension, then try again.', 'error');
         return;
       }
       if (connectedWalletProvider && connectedWalletProvider !== provider) {
@@ -927,6 +976,7 @@
       connectedWalletName = choice;
       const address = typeof publicKey.toBase58 === 'function' ? publicKey.toBase58() : String(publicKey);
       updateWalletUI(address);
+      $('otherWalletModal').hidden = true;
 
       if (walletAccountHandler && provider.removeListener) {
         provider.removeListener('accountChanged', walletAccountHandler);
@@ -952,7 +1002,8 @@
 
   connectWalletBtn.addEventListener('click', () => connectWallet('Phantom'));
   connectSolflareBtn.addEventListener('click', () => connectWallet('Solflare'));
-  connectOtherWalletBtn.addEventListener('click', () => connectWallet('Other wallets'));
+  connectOtherWalletBtn.addEventListener('click', openOtherWalletsModal);
+  $('closeOtherWalletsBtn').addEventListener('click', () => { $('otherWalletModal').hidden = true; });
 
 
   disconnectWalletBtn.addEventListener('click', async () => {
