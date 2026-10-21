@@ -1,8 +1,9 @@
-# Tick Cat
+# SHIPCAT
 
 A small arcade game in a single HTML file. An orange cat hops between checkboxes and ticks them before their outlines burn out. Chain ticks for a multiplier, grab gold boxes for bonus points, and survive as long as you can.
 
-Working title. Swap in the final name (see [Customise](#customise)).
+**Community:** [Join the X community](https://x.com/i/communities/1974725158540574780)  
+**CA:** coming soon
 
 ## Play
 
@@ -81,10 +82,11 @@ Choose the "Other" framework preset, leave the build command empty and set the o
 
 Everything lives in `index.html`.
 
-- **Name:** change the `<title>`, the two `og:` meta tags and the `<h1>` on the title screen.
+- **Name:** change the `<title>`, the two `og:` meta tags, the `<h1>` on the title screen and the canvas `aria-label`.
 - **Colours:** edit the tokens at the top of the `<style>` block (`--bg`, `--ink`, `--orange`, `--orange-deep`, `--dim`). The canvas reads the same tokens, so one edit restyles the whole game.
 - **Difficulty and scoring:** edit `difficulty()`, `multOf()` and `COMBO_WINDOW` in the script.
 - **Lives:** change the starting value of `lives` in `startGame()`, and the number of icons drawn in `hud()`.
+- **Contract address:** the title screen shows a "CA coming soon" chip. Replace the `<span class="chip ca">` in the `.links` block with the real address (and a link to the explorer) once it is live.
 - **Share preview:** add an `og:image` meta tag pointing to a PNG of the banner so links preview with art on X and Telegram.
 
 ## Files
