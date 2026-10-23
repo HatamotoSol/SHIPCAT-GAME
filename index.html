@@ -42,10 +42,10 @@
   }
   #app {
     position: relative; width: 100%; height: 100%; overflow: hidden;
-    background-color: var(--bg);
+    background-color: var(--stage-bg, var(--bg));
     background-image:
-      radial-gradient(ellipse at 50% 72%, rgba(255, 90, 31, 0.17), transparent 62%),
-      radial-gradient(rgba(242, 238, 230, 0.07) 1.5px, transparent 1.7px);
+      radial-gradient(ellipse at 50% 72%, rgba(var(--glow, 255, 90, 31), 0.17), transparent 62%),
+      radial-gradient(rgba(var(--dot, 242, 238, 230), 0.07) 1.5px, transparent 1.7px);
     background-size: auto, 42px 42px;
   }
   #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
@@ -198,6 +198,14 @@
   .m-msg { margin: 0; min-height: 1.3em; font-size: 13px; color: var(--warn); }
   .m-note { margin: 0; font-size: 12px; color: var(--dim); }
   .wallet-pill:focus-visible, .btn-sm:focus-visible, .w-row:focus-visible, .chip:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  /* ---------- stages ---------- */
+  .stage-tag { display: block; width: max-content; margin-top: 5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 11px; letter-spacing: 0.08em; white-space: nowrap; color: var(--acc, var(--orange)); }
+  .stage-banner { position: absolute; z-index: 3; left: 0; right: 0; top: 26%; display: grid; gap: 6px; justify-items: center; text-align: center; pointer-events: none; padding: 0 16px; }
+  .stage-banner small { font-size: 13px; font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase; color: var(--dim); }
+  .stage-banner b { font-family: var(--display); font-weight: 400; font-size: clamp(38px, 11vw, 72px); line-height: 1; color: var(--acc, var(--orange)); text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35); }
+  .stage-banner.go { animation: banner 2s ease-out both; }
+  @keyframes banner { 0% { opacity: 0; transform: scale(0.85); } 12% { opacity: 1; transform: scale(1.04); } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
+  .stage-line { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
   .tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bg); background: var(--ink); padding: 5px 12px; border-radius: 999px; }
 
   @media (min-height: 561px) {
@@ -210,6 +218,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .score-n.bump { animation: none; }
+    .stage-banner.go { animation: none; }
     .primary { transition: none; }
   }
 </style>
@@ -222,7 +231,7 @@
   <div class="hud" id="hud">
     <div class="score">
       <div class="score-n" id="score">0</div>
-      <div class="best">Best <span id="best">0</span></div>
+      <div class="best">Best <span id="best">0</span><span class="stage-tag" id="stageTag">Stage 1</span></div>
     </div>
     <div class="combo" id="combo" hidden>
       <div class="combo-x" id="mult">×2</div>
@@ -238,6 +247,7 @@
   </div>
 
   <div class="hint off" id="hint">Tap a box</div>
+  <div class="stage-banner" id="stageBanner" hidden aria-live="polite"><small id="sbNum">Stage 2</small><b id="sbName">Sunset</b></div>
 
   <!-- Title -->
   <div class="overlay" id="title">
@@ -305,6 +315,7 @@
   <div class="overlay" id="over" hidden>
     <span class="tag" id="overTag" hidden>New best</span>
     <h2 id="overTitle">Out of checks</h2>
+    <p class="stage-line" id="overStage" hidden></p>
     <div class="big-score" id="overScore">0</div>
     <dl class="stats">
       <div><dt>Ticks</dt><dd id="sTicks">0</dd></div>
@@ -362,7 +373,7 @@
   const $ = (id) => document.getElementById(id);
   const rootStyle = getComputedStyle(document.documentElement);
   const tok = (n) => rootStyle.getPropertyValue(n).trim();
-  const COL = { bg: tok('--bg') || '#0E0E0E', ink: tok('--ink') || '#F2EEE6', orange: tok('--orange') || '#FF5A1F', deep: tok('--orange-deep') || '#C73C0C', dim: tok('--dim') || '#8F8678' };
+  const COL = { bg: tok('--bg') || '#0E0E0E', ink: tok('--ink') || '#F2EEE6', orange: tok('--orange') || '#FF5A1F', deep: tok('--orange-deep') || '#C73C0C', dim: tok('--dim') || '#8F8678', gold: tok('--ink') || '#F2EEE6' };
   const DISPLAY = '"Dela Gothic One", "Arial Black", Impact, system-ui, sans-serif';
   const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -447,13 +458,15 @@
     },
     miss() { blip(170, 0.3, 'sawtooth', 0.07, 0.45); },
     over() { blip(330, 0.18, 'triangle', 0.09, 0.7); blip(247, 0.22, 'triangle', 0.09, 0.7, 0.16); blip(165, 0.4, 'triangle', 0.09, 0.6, 0.34); },
-    start() { blip(392, 0.09, 'triangle', 0.08); blip(523, 0.12, 'triangle', 0.08, 1, 0.09); }
+    start() { blip(392, 0.09, 'triangle', 0.08); blip(523, 0.12, 'triangle', 0.08, 1, 0.09); },
+    stage() { [392, 523, 659, 784].forEach((f, i) => blip(f, 0.14, 'triangle', 0.08, 1, i * 0.08)); }
   };
 
   // ---------- helpers ----------
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const rand = (a, b) => a + Math.random() * (b - a);
   const easeOutBack = (t) => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+  const easeInOut = (t) => t * t * (3 - 2 * t);
   const active = (b) => !b.ticked && !b.missed;
 
   function bounds() {
@@ -481,13 +494,64 @@
     if (state === 'title' || (!cat.x && !cat.y)) { cat.x = W / 2; cat.y = H * 0.66; }
   }
 
+  // ---------- stages ----------
+  // Each stage has a score threshold (from), a start and an end value for how fast boxes spawn (every),
+  // how long a box lasts (life) and how many can be on screen (cap), and a colour mood (theme).
+  // Inside a stage the values slide from start to end over `ramp` seconds of time spent in that stage.
+  // A new stage starts about 8% easier than the last one ended and opens with a short breather.
+  // Stages 3 to 5 are added as extra rows; the last stage holds its end values.
+  const BREATHER = 1.5;
+  const STAGES = [
+    { name: 'Night Shift', from: 0, every: [1.10, 0.85], life: [4.4, 3.6], cap: [4, 5], ramp: 28,
+      theme: { bg: [14, 14, 14], glow: [255, 90, 31], dot: [242, 238, 230], acc: [255, 90, 31], deep: [199, 60, 12], ink: [242, 238, 230], gold: [242, 238, 230], dim: [143, 134, 120] } },
+    // Sunset is the last stage for now, so it climbs to the game's previous top speed (0.5 s, 1.6 s, 8 boxes).
+    { name: 'Sunset', from: 120, every: [0.92, 0.50], life: [3.9, 1.6], cap: [6, 8], ramp: 55,
+      theme: { bg: [26, 13, 30], glow: [190, 50, 100], dot: [255, 233, 214], acc: [255, 107, 139], deep: [168, 47, 87], ink: [255, 233, 214], gold: [255, 209, 102], dim: [160, 138, 147] } }
+  ];
+  let stageIdx = 0, stageT = 0, breather = 0;
+  const P = {};                       // live palette (rgb arrays), blended while a stage change fades in
+  let themeFrom = null, themeTo = STAGES[0].theme, themeT = 1;
+  const rgb = (c) => 'rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')';
+  const rgba = (c, a) => 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + a + ')';
+  function applyPalette() {
+    const app = $('app');
+    for (const k in themeTo) {
+      P[k] = (themeFrom && themeT < 1) ? themeFrom[k].map((v, i) => v + (themeTo[k][i] - v) * easeInOut(themeT)) : themeTo[k].slice();
+    }
+    COL.bg = rgb(P.bg); COL.ink = rgb(P.ink); COL.orange = rgb(P.acc); COL.deep = rgb(P.deep); COL.dim = rgb(P.dim); COL.gold = rgb(P.gold);
+    app.style.setProperty('--stage-bg', COL.bg);
+    app.style.setProperty('--acc', COL.orange);
+    app.style.setProperty('--glow', (P.glow[0] | 0) + ', ' + (P.glow[1] | 0) + ', ' + (P.glow[2] | 0));
+    app.style.setProperty('--dot', (P.dot[0] | 0) + ', ' + (P.dot[1] | 0) + ', ' + (P.dot[2] | 0));
+    app.style.setProperty('--veil', rgba(P.bg, 0.9));
+  }
+  function showBanner(i) {
+    const el = $('stageBanner');
+    $('sbNum').textContent = 'Stage ' + (i + 1);
+    $('sbName').textContent = STAGES[i].name;
+    el.hidden = false;
+    el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+    clearTimeout(showBanner.t);
+    showBanner.t = setTimeout(() => { el.hidden = true; el.classList.remove('go'); }, 2000);
+  }
+  function enterStage(i) {
+    themeFrom = {};
+    for (const k in P) themeFrom[k] = P[k].slice();
+    themeTo = STAGES[i].theme; themeT = 0;
+    stageIdx = i; stageT = 0; breather = BREATHER; spawnT = 0.4;
+    sfx.stage();
+    showBanner(i);
+    hud(false);
+  }
+  function checkStage() {
+    while (stageIdx + 1 < STAGES.length && score >= STAGES[stageIdx + 1].from) enterStage(stageIdx + 1);
+  }
+
   // ---------- spawning ----------
   function difficulty() {
-    return {
-      every: Math.max(0.5, 1.1 - gt * 0.009),
-      life: Math.max(1.6, 4.4 - gt * 0.028),
-      max: Math.min(8, 4 + Math.floor(gt / 15))
-    };
+    const st = STAGES[stageIdx], p = clamp(stageT / st.ramp, 0, 1);
+    const at = (a) => a[0] + (a[1] - a[0]) * p;
+    return { every: at(st.every), life: at(st.life), max: Math.round(at(st.cap)) };
   }
   function spawnBox() {
     const d = difficulty();
@@ -549,6 +613,7 @@
 
   // ---------- scoring ----------
   function tickBox(b) {
+    if (state !== 'playing') return;   // no points once the last life is lost
     b.ticked = true; b.tickAt = gt;
     const before = multOf(combo);
     combo++; comboT = COMBO_WINDOW; ticks++;
@@ -558,9 +623,10 @@
     score += pts;
     sfx.tick(combo, b.gold);
     burst(b.x, b.y, b.gold);
-    floats.push({ x: b.x, y: b.y - b.size * 0.2, txt: '+' + pts, age: 0, life: 0.8, col: b.gold ? COL.ink : COL.orange, size: b.gold ? 30 : 24 });
+    floats.push({ x: b.x, y: b.y - b.size * 0.2, txt: '+' + pts, age: 0, life: 0.8, col: b.gold ? COL.gold : COL.orange, size: b.gold ? 30 : 24 });
     if (m > before) floats.push({ x: b.x, y: b.y - b.size * 0.85, txt: '×' + m + '!', age: 0, life: 1, col: COL.ink, size: 28 });
     if (hintShown) { hintShown = false; $('hint').classList.add('off'); }
+    checkStage();
     hud(true);
   }
   function loseLife() {
@@ -575,9 +641,9 @@
     const n = REDUCED ? 4 : 11;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rand(-0.2, 0.2), sp = rand(140, 320);
-      parts.push({ type: 'sq', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 60, age: 0, life: rand(0.35, 0.6), size: rand(5, 9), col: (i % 3 === 0 || gold) ? COL.ink : COL.orange });
+      parts.push({ type: 'sq', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 60, age: 0, life: rand(0.35, 0.6), size: rand(5, 9), col: gold ? COL.gold : (i % 3 === 0 ? COL.ink : COL.orange) });
     }
-    parts.push({ type: 'ring', x, y, age: 0, life: 0.4, size: S, col: gold ? COL.ink : COL.orange });
+    parts.push({ type: 'ring', x, y, age: 0, life: 0.4, size: S, col: gold ? COL.gold : COL.orange });
   }
 
   // ---------- game flow ----------
@@ -594,6 +660,8 @@
     ensureAudio();
     boxes = []; parts = []; floats = [];
     score = 0; lives = 3; combo = 0; comboT = 0; ticks = 0; maxCombo = 0; gt = 0; shake = 0;
+    stageIdx = 0; stageT = 0; breather = 0; themeFrom = null; themeTo = STAGES[0].theme; themeT = 1; applyPalette();
+    clearTimeout(showBanner.t); $('stageBanner').hidden = true;
     cat.queue = []; cat.target = null; cat.hop = false; cat.land = 0;
     cat.x = W / 2; cat.y = H * 0.66;
     spawnT = 0.9;
@@ -612,6 +680,7 @@
       profile.best = Math.max(profile.best, score);
       profile.ticks += ticks;
       profile.streak = Math.max(profile.streak, maxCombo);
+      profile.stage = Math.max(profile.stage || 0, stageIdx + 1);
       writeProfile();
     }
     sfx.over();
@@ -621,6 +690,8 @@
       $('sTicks').textContent = ticks;
       $('sStreak').textContent = maxCombo;
       $('sBest').textContent = best;
+      $('overStage').hidden = stageIdx === 0;
+      $('overStage').textContent = 'Reached Stage ' + (stageIdx + 1) + ' \u00b7 ' + STAGES[stageIdx].name;
       $('overTag').hidden = !(isBest && score > 0);
       $('overTitle').textContent = isBest && score > 0 ? 'Nice run' : 'Out of checks';
       setOverlay('over');
@@ -647,6 +718,7 @@
     s.textContent = score;
     if (bump) { s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
     $('best').textContent = Math.max(best, score);
+    $('stageTag').textContent = 'Stage ' + (stageIdx + 1);
     const lv = $('lives');
     let html = '';
     for (let i = 0; i < 3; i++) html += '<span class="life' + (i >= lives ? ' lost' : '') + '">' + LIFE_SVG + '</span>';
@@ -714,21 +786,21 @@
     const lw = s * 0.13, r = s * 0.26, w = s - lw, L = 2 * (w + w) - 8 * r + 2 * Math.PI * r;
     // interior (warms up briefly when ticked)
     rrPath(0, 0, w, w, r);
-    ctx.fillStyle = 'rgba(14,14,14,0.62)';
+    ctx.fillStyle = rgba(P.bg, 0.62);
     ctx.fill();
     if (b.ticked) {
-      ctx.fillStyle = 'rgba(255,90,31,' + (0.32 * (1 - clamp((gt - b.tickAt) / 0.35, 0, 1))).toFixed(3) + ')';
+      ctx.fillStyle = rgba(P.acc, (0.32 * (1 - clamp((gt - b.tickAt) / 0.35, 0, 1))).toFixed(3));
       ctx.fill();
     }
     // track
     ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    ctx.strokeStyle = b.gold ? 'rgba(242,238,230,0.16)' : 'rgba(199,60,12,0.4)';
+    ctx.strokeStyle = b.gold ? rgba(P.gold, 0.16) : rgba(P.deep, 0.4);
     ctx.stroke();
     // remaining time
     const frac = b.ticked ? 1 : b.missed ? 0 : clamp(1 - age / b.life, 0, 1);
     if (frac > 0.012) {
       const danger = !b.ticked && frac < 0.3 && Math.floor(gt * 8) % 2 === 0;
-      let col = b.gold ? COL.ink : COL.orange;
+      let col = b.gold ? COL.gold : COL.orange;
       if (danger) col = b.gold ? COL.orange : COL.ink;
       ctx.strokeStyle = col;
       ctx.setLineDash([L * frac, L + 10]);
@@ -750,10 +822,10 @@
       polyline([[0.2 * s, -0.2 * s], [-0.2 * s, 0.2 * s]], p);
     } else {
       ctx.lineWidth = s * 0.12; ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
-      ctx.strokeStyle = 'rgba(242,238,230,0.07)';
+      ctx.strokeStyle = rgba(P.ink, 0.07);
       polyline([[-0.27 * s, 0.0], [-0.07 * s, 0.2 * s], [0.29 * s, -0.27 * s]], 1);
       if (b.gold) {
-        ctx.fillStyle = 'rgba(242,238,230,0.5)';
+        ctx.fillStyle = rgba(P.gold, 0.5);
         ctx.font = (s * 0.2) + 'px ' + DISPLAY;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText('+3', 0, s * 0.3);
@@ -763,7 +835,7 @@
     // marker for boxes the cat is heading to
     if (active(b) && (b === cat.target || cat.queue.includes(b))) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(242,238,230,0.55)';
+      ctx.strokeStyle = rgba(P.ink, 0.55);
       ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
       ctx.lineDashOffset = -gt * 30;
       rrPath(b.x, b.y, s * 1.2, s * 1.2, s * 0.34);
@@ -847,15 +919,18 @@
     if (!W) { resize(); if (!W) return; }
 
     if (state === 'playing') {
-      gt += dt;
-      // spawning
-      const d = difficulty();
-      spawnT -= dt;
-      const act = boxes.filter(active).length;
-      if (act === 0 && spawnT > 0.25) spawnT = 0.25;
-      if (spawnT <= 0) {
-        if (act < d.max && spawnBox()) spawnT = d.every * rand(0.8, 1.2);
-        else spawnT = 0.15;
+      gt += dt; stageT += dt;
+      // spawning (paused briefly right after a stage change)
+      if (breather > 0) breather -= dt;
+      else {
+        const d = difficulty();
+        spawnT -= dt;
+        const act = boxes.filter(active).length;
+        if (act === 0 && spawnT > 0.25) spawnT = 0.25;
+        if (spawnT <= 0) {
+          if (act < d.max && spawnBox()) spawnT = d.every * rand(0.8, 1.2);
+          else spawnT = 0.15;
+        }
       }
       // box expiry
       for (const b of boxes) {
@@ -878,6 +953,8 @@
     }
     boxes = boxes.filter((b) => !(b.ticked && gt - b.tickAt > 0.6) && !(b.missed && gt - b.missAt > 0.7));
     if (shake > 0) shake = Math.max(0, shake - dt);
+
+    if (themeT < 1 && state !== 'paused') { themeT = Math.min(1, themeT + dt); applyPalette(); }
 
     // draw
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -959,7 +1036,7 @@
         if (old > 0) { p.best = old; localStorage.removeItem('tickcat.best'); }
       } catch (e) {}
     }
-    return { best: +p.best || 0, ticks: +p.ticks || 0, streak: +p.streak || 0 };
+    return { best: +p.best || 0, ticks: +p.ticks || 0, streak: +p.streak || 0, stage: +p.stage || 0 };
   }
   function writeProfile() {
     if (!identity) return;
@@ -1286,6 +1363,7 @@
   // ---------- boot ----------
   paintMute();
   hud(false);
+  applyPalette();
   setOverlay('title');
   paintWallet();
   $('best').textContent = best;
@@ -1296,6 +1374,7 @@
   // test hook
   window.__tickcat = {
     get state() { return state; }, get score() { return score; }, get lives() { return lives; },
+    get stage() { return stageIdx + 1; }, get diff() { return difficulty(); }, get spawned() { return nextId - 1; },
     get identity() { return identity ? { kind: identity.kind, address: identity.address } : null; }, get profile() { return { ...profile }; },
     get boxes() { return boxes.map((b) => ({ x: b.x, y: b.y, size: b.size, gold: b.gold, active: active(b) })); },
     get cat() { return { x: cat.x, y: cat.y, hop: cat.hop }; }
