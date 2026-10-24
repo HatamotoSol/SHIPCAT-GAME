@@ -499,14 +499,17 @@
   // how long a box lasts (life) and how many can be on screen (cap), and a colour mood (theme).
   // Inside a stage the values slide from start to end over `ramp` seconds of time spent in that stage.
   // A new stage starts about 8% easier than the last one ended and opens with a short breather.
-  // Stages 3 to 5 are added as extra rows; the last stage holds its end values.
+  // Stages 4 and 5 are added as extra rows; the last stage holds its end values.
   const BREATHER = 1.5;
   const STAGES = [
     { name: 'Night Shift', from: 0, every: [1.10, 0.85], life: [4.4, 3.6], cap: [4, 5], ramp: 28,
       theme: { bg: [14, 14, 14], glow: [255, 90, 31], dot: [242, 238, 230], acc: [255, 90, 31], deep: [199, 60, 12], ink: [242, 238, 230], gold: [242, 238, 230], dim: [143, 134, 120] } },
-    // Sunset is the last stage for now, so it climbs to the game's previous top speed (0.5 s, 1.6 s, 8 boxes).
-    { name: 'Sunset', from: 120, every: [0.92, 0.50], life: [3.9, 1.6], cap: [6, 8], ramp: 55,
-      theme: { bg: [26, 13, 30], glow: [190, 50, 100], dot: [255, 233, 214], acc: [255, 107, 139], deep: [168, 47, 87], ink: [255, 233, 214], gold: [255, 209, 102], dim: [160, 138, 147] } }
+    // Sunset ends a little below the game's old top speed; stage 3 goes past it.
+    { name: 'Sunset', from: 120, every: [0.92, 0.62], life: [3.9, 2.4], cap: [6, 7], ramp: 40,
+      theme: { bg: [26, 13, 30], glow: [190, 50, 100], dot: [255, 233, 214], acc: [255, 107, 139], deep: [168, 47, 87], ink: [255, 233, 214], gold: [255, 209, 102], dim: [160, 138, 147] } },
+    // Stage 3 is the last stage for now and holds its end values.
+    { name: 'Deep Sea', from: 450, every: [0.66, 0.46], life: [2.6, 1.5], cap: [7, 8], ramp: 60,
+      theme: { bg: [8, 24, 34], glow: [20, 130, 160], dot: [190, 235, 240], acc: [38, 214, 196], deep: [12, 120, 124], ink: [214, 240, 240], gold: [255, 209, 102], dim: [118, 150, 160] } }
   ];
   let stageIdx = 0, stageT = 0, breather = 0;
   const P = {};                       // live palette (rgb arrays), blended while a stage change fades in
