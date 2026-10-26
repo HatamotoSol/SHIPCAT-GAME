@@ -499,7 +499,7 @@
   // how long a box lasts (life) and how many can be on screen (cap), and a colour mood (theme).
   // Inside a stage the values slide from start to end over `ramp` seconds of time spent in that stage.
   // A new stage starts about 8% easier than the last one ended and opens with a short breather.
-  // Stages 4 and 5 are added as extra rows; the last stage holds its end values.
+  // Stage 5 is added as one more row; the last stage holds its end values.
   const BREATHER = 1.5;
   const STAGES = [
     { name: 'Night Shift', from: 0, every: [1.10, 0.85], life: [4.4, 3.6], cap: [4, 5], ramp: 28,
@@ -507,9 +507,11 @@
     // Sunset ends a little below the game's old top speed; stage 3 goes past it.
     { name: 'Sunset', from: 120, every: [0.92, 0.62], life: [3.9, 2.4], cap: [6, 7], ramp: 40,
       theme: { bg: [26, 13, 30], glow: [190, 50, 100], dot: [255, 233, 214], acc: [255, 107, 139], deep: [168, 47, 87], ink: [255, 233, 214], gold: [255, 209, 102], dim: [160, 138, 147] } },
-    // Stage 3 is the last stage for now and holds its end values.
-    { name: 'Deep Sea', from: 450, every: [0.66, 0.46], life: [2.6, 1.5], cap: [7, 8], ramp: 60,
-      theme: { bg: [8, 24, 34], glow: [20, 130, 160], dot: [190, 235, 240], acc: [38, 214, 196], deep: [12, 120, 124], ink: [214, 240, 240], gold: [255, 209, 102], dim: [118, 150, 160] } }
+    { name: 'Deep Sea', from: 450, every: [0.66, 0.52], life: [2.6, 1.8], cap: [7, 8], ramp: 55,
+      theme: { bg: [8, 24, 34], glow: [20, 130, 160], dot: [190, 235, 240], acc: [38, 214, 196], deep: [12, 120, 124], ink: [214, 240, 240], gold: [255, 209, 102], dim: [118, 150, 160] } },
+    // Stage 4 is the last stage for now and holds its end values. It also paints a moving aurora behind the boxes.
+    { name: 'Aurora', from: 900, every: [0.58, 0.40], life: [1.95, 1.3], cap: [8, 9], ramp: 60, art: 'aurora',
+      theme: { bg: [11, 9, 32], glow: [120, 70, 220], dot: [220, 210, 255], acc: [182, 128, 255], deep: [104, 58, 190], ink: [232, 226, 255], gold: [255, 226, 140], dim: [140, 132, 176] } }
   ];
   let stageIdx = 0, stageT = 0, breather = 0;
   const P = {};                       // live palette (rgb arrays), blended while a stage change fades in
@@ -548,6 +550,50 @@
   }
   function checkStage() {
     while (stageIdx + 1 < STAGES.length && score >= STAGES[stageIdx + 1].from) enterStage(stageIdx + 1);
+  }
+
+  // ---------- aurora backdrop (stage 4) ----------
+  const REDUCE = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const STARS = Array.from({ length: 46 }, (_, i) => ({ x: ((i * 0.6180339) % 1), y: ((i * 0.3819660 + 0.17) % 1) * 0.62, r: 0.6 + (i % 4) * 0.45, ph: i * 1.7 }));
+  const RIBBONS = [
+    { y: 0.18, amp: 34, len: 0.30, f: 0.011, sp: 0.35, ph: 0.0, c: [70, 255, 196], a: 0.34 },
+    { y: 0.27, amp: 42, len: 0.34, f: 0.008, sp: -0.27, ph: 2.1, c: [166, 116, 255], a: 0.36 },
+    { y: 0.36, amp: 30, len: 0.26, f: 0.013, sp: 0.22, ph: 4.2, c: [255, 120, 200], a: 0.26 }
+  ];
+  let artA = 0;
+  function drawArt(time, dt) {
+    const want = STAGES[stageIdx].art === 'aurora' ? 1 : 0;
+    artA += Math.sign(want - artA) * Math.min(Math.abs(want - artA), dt * 0.7);
+    if (artA <= 0.001) return;
+    const t = REDUCE ? 0 : time;
+    ctx.save();
+    ctx.globalAlpha = artA;
+    ctx.fillStyle = rgb(P.ink);
+    for (const s of STARS) {                       // twinkling stars
+      ctx.globalAlpha = artA * (0.25 + 0.5 * (0.5 + 0.5 * Math.sin(t * 1.3 + s.ph)));
+      ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    for (const r of RIBBONS) {                     // slow ribbons of light
+      const top = r.y * H, len = r.len * H, step = 14;
+      const g = ctx.createLinearGradient(0, top - r.amp, 0, top + len + r.amp);
+      const c = r.c.join(',');
+      g.addColorStop(0, 'rgba(' + c + ',0)');
+      g.addColorStop(0.35, 'rgba(' + c + ',' + r.a + ')');
+      g.addColorStop(1, 'rgba(' + c + ',0)');
+      ctx.fillStyle = g; ctx.globalAlpha = artA;
+      ctx.beginPath();
+      for (let x = 0; x <= W + step; x += step) {
+        const y = top + Math.sin(x * r.f + t * r.sp + r.ph) * r.amp + Math.sin(x * r.f * 2.3 - t * r.sp * 1.4) * r.amp * 0.35;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      for (let x = W + step; x >= 0; x -= step) {
+        const y = top + len + Math.sin(x * r.f * 0.8 + t * r.sp * 0.7 + r.ph + 1) * r.amp * 0.8;
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
   }
 
   // ---------- spawning ----------
@@ -663,7 +709,7 @@
     ensureAudio();
     boxes = []; parts = []; floats = [];
     score = 0; lives = 3; combo = 0; comboT = 0; ticks = 0; maxCombo = 0; gt = 0; shake = 0;
-    stageIdx = 0; stageT = 0; breather = 0; themeFrom = null; themeTo = STAGES[0].theme; themeT = 1; applyPalette();
+    artA = 0; stageIdx = 0; stageT = 0; breather = 0; themeFrom = null; themeTo = STAGES[0].theme; themeT = 1; applyPalette();
     clearTimeout(showBanner.t); $('stageBanner').hidden = true;
     cat.queue = []; cat.target = null; cat.hop = false; cat.land = 0;
     cat.x = W / 2; cat.y = H * 0.66;
@@ -962,6 +1008,7 @@
     // draw
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
+    drawArt(now / 1000, state === 'paused' ? 0 : dt);
     ctx.save();
     if (shake > 0) ctx.translate(rand(-1, 1) * 9 * (shake / 0.3), rand(-1, 1) * 9 * (shake / 0.3));
     const sorted = boxes.slice().sort((a, b) => a.y - b.y);
