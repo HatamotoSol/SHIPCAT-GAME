@@ -509,9 +509,12 @@
       theme: { bg: [26, 13, 30], glow: [190, 50, 100], dot: [255, 233, 214], acc: [255, 107, 139], deep: [168, 47, 87], ink: [255, 233, 214], gold: [255, 209, 102], dim: [160, 138, 147] } },
     { name: 'Deep Sea', from: 450, every: [0.66, 0.52], life: [2.6, 1.8], cap: [7, 8], ramp: 55,
       theme: { bg: [8, 24, 34], glow: [20, 130, 160], dot: [190, 235, 240], acc: [38, 214, 196], deep: [12, 120, 124], ink: [214, 240, 240], gold: [255, 209, 102], dim: [118, 150, 160] } },
-    // Stage 4 is the last stage for now and holds its end values. It also paints a moving aurora behind the boxes.
+    // Stage 4 paints a moving aurora behind the boxes.
     { name: 'Aurora', from: 900, every: [0.58, 0.40], life: [1.95, 1.3], cap: [8, 9], ramp: 60, art: 'aurora',
-      theme: { bg: [11, 9, 32], glow: [120, 70, 220], dot: [220, 210, 255], acc: [182, 128, 255], deep: [104, 58, 190], ink: [232, 226, 255], gold: [255, 226, 140], dim: [140, 132, 176] } }
+      theme: { bg: [11, 9, 32], glow: [120, 70, 220], dot: [220, 210, 255], acc: [182, 128, 255], deep: [104, 58, 190], ink: [232, 226, 255], gold: [255, 226, 140], dim: [140, 132, 176] } },
+    // Stage 5 is the final, endless stage: it holds its end values, only a touch past Aurora's, and paints a rising sun.
+    { name: 'Daybreak', from: 1300, every: [0.43, 0.38], life: [1.42, 1.2], cap: [9, 9], ramp: 45, art: 'daybreak',
+      theme: { bg: [30, 13, 24], glow: [255, 140, 60], dot: [255, 230, 200], acc: [255, 196, 80], deep: [196, 124, 28], ink: [255, 244, 224], gold: [255, 255, 255], dim: [176, 148, 140] } }
   ];
   let stageIdx = 0, stageT = 0, breather = 0;
   const P = {};                       // live palette (rgb arrays), blended while a stage change fades in
@@ -560,12 +563,42 @@
     { y: 0.27, amp: 42, len: 0.34, f: 0.008, sp: -0.27, ph: 2.1, c: [166, 116, 255], a: 0.36 },
     { y: 0.36, amp: 30, len: 0.26, f: 0.013, sp: 0.22, ph: 4.2, c: [255, 120, 200], a: 0.26 }
   ];
-  let artA = 0;
+  let artA = 0, dayA = 0;
+  function drawDaybreak(t, a) {                    // a low sun that rises slowly, with fanned rays
+    const R = Math.min(W, H) * 0.26, cx = W / 2;
+    const cy = H * 0.93 - (REDUCE ? 0.5 : 0.5 + 0.5 * Math.sin(t * 0.12)) * H * 0.035;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const N = 16, sway = REDUCE ? 0 : Math.sin(t * 0.2) * 0.04;
+    for (let i = 0; i < N; i += 2) {
+      const a0 = -Math.PI + (i / N) * Math.PI + sway, a1 = a0 + (Math.PI / N) * 0.9;
+      const g = ctx.createRadialGradient(cx, cy, R * 0.6, cx, cy, H * 1.1);
+      g.addColorStop(0, 'rgba(255,190,90,' + (0.14 * a).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,190,90,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a0) * H * 1.3, cy + Math.sin(a0) * H * 1.3);
+      ctx.lineTo(cx + Math.cos(a1) * H * 1.3, cy + Math.sin(a1) * H * 1.3);
+      ctx.closePath(); ctx.fill();
+    }
+    let g = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 3.2);
+    g.addColorStop(0, 'rgba(255,170,70,' + (0.34 * a).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,170,70,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 3.2, 0, 6.2832); ctx.fill();
+    g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    g.addColorStop(0, 'rgba(255,232,160,' + (0.55 * a).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,150,70,' + (0.30 * a).toFixed(3) + ')');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832); ctx.fill();
+    ctx.restore();
+  }
   function drawArt(time, dt) {
-    const want = STAGES[stageIdx].art === 'aurora' ? 1 : 0;
-    artA += Math.sign(want - artA) * Math.min(Math.abs(want - artA), dt * 0.7);
-    if (artA <= 0.001) return;
+    const kind = STAGES[stageIdx].art;
+    const fade = (v, want) => v + Math.sign(want - v) * Math.min(Math.abs(want - v), dt * 0.7);
+    artA = fade(artA, kind === 'aurora' ? 1 : 0);
+    dayA = fade(dayA, kind === 'daybreak' ? 1 : 0);
     const t = REDUCE ? 0 : time;
+    if (dayA > 0.001) drawDaybreak(t, dayA);
+    if (artA <= 0.001) return;
     ctx.save();
     ctx.globalAlpha = artA;
     ctx.fillStyle = rgb(P.ink);
@@ -709,7 +742,7 @@
     ensureAudio();
     boxes = []; parts = []; floats = [];
     score = 0; lives = 3; combo = 0; comboT = 0; ticks = 0; maxCombo = 0; gt = 0; shake = 0;
-    artA = 0; stageIdx = 0; stageT = 0; breather = 0; themeFrom = null; themeTo = STAGES[0].theme; themeT = 1; applyPalette();
+    artA = 0; dayA = 0; stageIdx = 0; stageT = 0; breather = 0; themeFrom = null; themeTo = STAGES[0].theme; themeT = 1; applyPalette();
     clearTimeout(showBanner.t); $('stageBanner').hidden = true;
     cat.queue = []; cat.target = null; cat.hop = false; cat.land = 0;
     cat.x = W / 2; cat.y = H * 0.66;
